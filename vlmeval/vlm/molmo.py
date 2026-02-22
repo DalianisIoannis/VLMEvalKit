@@ -185,8 +185,7 @@ class molmo(BaseModel):
             output = self.model.generate_from_batch(
                 inputs,
                 GenerationConfig(max_new_tokens=200, stop_strings="<|endoftext|>"),
-                tokenizer=self.processor.tokenizer,
-                use_cache=False
+                tokenizer=self.processor.tokenizer
             )
 
         # only get generated tokens; decode them to text

@@ -9,7 +9,6 @@ import pandas as pd
 
 from .image_base import ImageBaseDataset
 from ..smp import *
-from ..smp.file import get_intermediate_file_path
 
 # should be the same as  FAIL_MSG definded in vlmeval/inference.py
 FAIL_MSG = 'Failed to obtain answer via API.'
@@ -57,7 +56,7 @@ class CCOCRDataset(ImageBaseDataset):
         "CCOCR_MultiSceneOcr_UgcLaion": "https://www.modelscope.cn/datasets/Qwen/CC-OCR/resolve/master/multi_scene_ocr/ugc_text/ugc_laion_400.tsv",
         "CCOCR_MultiSceneOcr_ZhDense": "https://www.modelscope.cn/datasets/Qwen/CC-OCR/resolve/master/multi_scene_ocr/ugc_text/zh_dense_50.tsv",
         "CCOCR_MultiSceneOcr_ZhVertical": "https://www.modelscope.cn/datasets/Qwen/CC-OCR/resolve/master/multi_scene_ocr/ugc_text/zh_vertical_100.tsv",
-        "CCOCR": "https://opencompass.openxlab.space/utils/VLMEval/CCOCR.tsv"
+        "CCOCR": "http://opencompass.openxlab.space/utils/VLMEval/CCOCR.tsv"
     }
 
     DATASET_URL_HUGGINGFACE = {
@@ -100,7 +99,7 @@ class CCOCRDataset(ImageBaseDataset):
         "CCOCR_MultiSceneOcr_UgcLaion": "https://huggingface.co/datasets/wulipc/CC-OCR/resolve/main/multi_scene_ocr/ugc_text/ugc_laion_400.tsv",
         "CCOCR_MultiSceneOcr_ZhDense": "https://huggingface.co/datasets/wulipc/CC-OCR/resolve/main/multi_scene_ocr/ugc_text/zh_dense_50.tsv",
         "CCOCR_MultiSceneOcr_ZhVertical": "https://huggingface.co/datasets/wulipc/CC-OCR/resolve/main/multi_scene_ocr/ugc_text/zh_vertical_100.tsv",
-        "CCOCR": "https://opencompass.openxlab.space/utils/VLMEval/CCOCR.tsv"
+        "CCOCR": "http://opencompass.openxlab.space/utils/VLMEval/CCOCR.tsv"
     }
 
     # define data path
@@ -192,7 +191,6 @@ class CCOCRDataset(ImageBaseDataset):
         Evaluate the combined CCOCR dataset containing all sub-datasets
         """
         df = load(eval_file)
-        df['prediction'] = [str(x) for x in df['prediction']]
         required_colume_list = ['answer', 'prediction', "category", "image_name", "l2-category", "split"]
         for required_colume in required_colume_list:
             assert required_colume in df, "required_colume: {} NOT found".format(required_colume)
@@ -231,12 +229,13 @@ class CCOCRDataset(ImageBaseDataset):
                 print(f"Failed to evaluate {sub_dataset_id}")
 
         # Save comprehensive results
-        result_file = get_intermediate_file_path(eval_file, '_comprehensive_eval', 'json')
+        base_name = os.path.splitext(os.path.abspath(eval_file))[0]
         comprehensive_result = {
             "meta": {"total_datasets": len(all_results), "datasets": list(all_results.keys())},
             "results": all_results,
             "summaries": all_summaries
         }
+        result_file = base_name + "_comprehensive_eval.json"
         dump(comprehensive_result, result_file)
         print(f"Comprehensive results saved to: {result_file}")
 
@@ -297,7 +296,4 @@ class CCOCRDataset(ImageBaseDataset):
         for k, v in res.items():
             print(f"  {k.upper():<20}: {v:.4f}")
         print("="*80)
-        df = d2df(res)
-        score_file = get_intermediate_file_path(eval_file, '_acc', 'csv')
-        dump(df, score_file)
         return res

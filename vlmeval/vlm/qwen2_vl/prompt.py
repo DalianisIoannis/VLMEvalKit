@@ -37,7 +37,7 @@ class Qwen2VLPromptMixin:
             return True
         if dataset_type == 'Y/N' and dataset in {'HallusionBench', 'POPE'}:  # MME has it's own prompt
             return True
-        if dataset_type == 'VQA' and dataset not in {'MMVet', 'ChartQAPro', 'ChartQAPro_CoT', 'ChartQAPro_PoT', 'ChartMuseum'}:  # noqa: E501
+        if dataset_type == 'VQA' and dataset not in {'MMVet'}:  # MMVet VQA has it's own prompt
             return True
         return False
 
@@ -88,7 +88,8 @@ class Qwen2VLPromptMixin:
     def _build_mcq_prompt(self, line, dataset: str) -> list[dict[str, str]]:
         """change the prompt for MCQ dataset: use chinese prompt if the question contains chinese characters."""
         MCQ_CN_PROMPT = '请直接回答选项字母。'
-        MCQ_EN_PROMPT = 'Please select the correct answer from the options above.'
+        # MCQ_EN_PROMPT = 'Please select the correct answer from the options above.'
+        MCQ_EN_PROMPT = 'Please select the correct answer from the options above. Respond with only the letter (A, B, C, or D) of the correct option.'
 
         import string
 

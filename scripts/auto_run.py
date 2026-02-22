@@ -26,9 +26,7 @@ args = parser.parse_args()
 models = [x for x in models if not listinstr(['MiniGPT', 'grounding-generalist'], x)]
 
 for m in models:
-    from vlmeval.smp import get_pred_file_format
-    pred_format = get_pred_file_format()
-    unknown_datasets = [x for x in args.data if not osp.exists(f'{m}/{m}_{x}.{pred_format}')]
+    unknown_datasets = [x for x in args.data if not osp.exists(f'{m}/{m}_{x}.xlsx')]
     if len(unknown_datasets) == 0:
         continue
     dataset_str = ' '.join(unknown_datasets)

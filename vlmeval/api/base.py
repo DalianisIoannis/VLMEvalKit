@@ -14,7 +14,7 @@ class BaseAPI:
 
     def __init__(self,
                  retry=10,
-                 wait=1,
+                 wait=3,
                  system_prompt=None,
                  verbose=True,
                  fail_msg='Failed to obtain answer via API.',
@@ -23,7 +23,7 @@ class BaseAPI:
 
         Args:
             retry (int, optional): The retry times for `generate_inner`. Defaults to 10.
-            wait (int, optional): The wait time after each failed retry of `generate_inner`. Defaults to 1.
+            wait (int, optional): The wait time after each failed retry of `generate_inner`. Defaults to 3.
             system_prompt (str, optional): Defaults to None.
             verbose (bool, optional): Defaults to True.
             fail_msg (str, optional): The message to return when failed to obtain answer.
@@ -210,8 +210,8 @@ class BaseAPI:
             if self.system_prompt is None:
                 self.system_prompt = system_prompt
             else:
-                if system_prompt not in self.system_prompt:
-                    self.system_prompt += '\n' + system_prompt
+                self.system_prompt += '\n' + system_prompt
+
         return new_message
 
     def generate(self, message, **kwargs1):
@@ -247,10 +247,6 @@ class BaseAPI:
                 if ret_code == 0 and self.fail_msg not in answer and answer != '':
                     if self.verbose:
                         print(answer)
-                    # Return both answer and extra_records
-                    # Add for agent evaluation
-                    if isinstance(log, dict):
-                        return {"prediction": answer, "extra_records": log}
                     return answer
                 elif self.verbose:
                     if not isinstance(log, str):
@@ -292,9 +288,3 @@ class BaseAPI:
             else:
                 image = [x['value'] for x in message if x['type'] == 'image'][0]
         return prompt, image
-
-    def dump_image(self, line, dataset):
-        return self.dump_image_func(line)
-
-    def set_dump_image(self, dump_image_func):
-        self.dump_image_func = dump_image_func

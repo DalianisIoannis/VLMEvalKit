@@ -6,7 +6,6 @@ import warnings
 
 from vlmeval.dataset.image_base import ImageBaseDataset
 from vlmeval.smp import misc, file
-from vlmeval.smp.file import get_intermediate_file_path
 from vlmeval import utils
 from vlmeval.dataset.utils import build_judge
 
@@ -104,8 +103,8 @@ def qid2category(mode: str) -> Tuple[Dict[int, str], str]:
 class CharXiv(ImageBaseDataset):
     TYPE = "VQA"
     DATASET_URL = {
-        "CharXiv_descriptive_val": "https://opencompass.openxlab.space/utils/VLMEval/CharXiv_descriptive_val.tsv",
-        "CharXiv_reasoning_val": "https://opencompass.openxlab.space/utils/VLMEval/CharXiv_reasoning_val.tsv",
+        "CharXiv_descriptive_val": "http://opencompass.openxlab.space/utils/VLMEval/CharXiv_descriptive_val.tsv",
+        "CharXiv_reasoning_val": "http://opencompass.openxlab.space/utils/VLMEval/CharXiv_reasoning_val.tsv",
     }
     DATASET_MD5 = {
         "CharXiv_descriptive_val": "e165037032f169a59dd09ea5d7ad3073",
@@ -204,9 +203,10 @@ class CharXiv(ImageBaseDataset):
         judge_model_name = judge_model.model
 
         # Define file paths
-        result_file = get_intermediate_file_path(eval_file, f"_{judge_model_name}")
-        temp_result_file = get_intermediate_file_path(eval_file, f"_{judge_model_name}", "pkl")
-        score_file = get_intermediate_file_path(result_file, "_acc", "csv")
+        suffix = eval_file.split(".")[-1]
+        result_file = eval_file.replace(f".{suffix}", f"_{judge_model_name}.xlsx")
+        temp_result_file = eval_file.replace(f".{suffix}", f"_{judge_model_name}.pkl")
+        score_file = result_file.replace(".xlsx", "_score.csv")
 
         # Return existing results if available
         if os.path.exists(result_file):
@@ -227,7 +227,7 @@ class CharXiv(ImageBaseDataset):
 
         # Identify unprocessed indices
         indices = [i for i in range(len(data)) if i not in processed_results]
-        tups = [(judge_model, data.iloc[i]) for i in range(len(data)) if i not in processed_results]
+        tups = [(judge_model, data.iloc[i]) for i in range(len(data))]
 
         # Process remaining examples
         nproc = judge_kwargs.pop("nproc", 4)

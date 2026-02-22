@@ -75,27 +75,6 @@ dataset_levels = {
     'spatial': [
         ('LEGO_circular', 'acc_all.csv'), ('BLINK_circular', 'acc_all.csv'), ('MMSIBench_circular', 'acc_all.csv'),
         ('Spatial457', 'score.json'), ('3DSRBench', 'acc_all.csv')
-    ],
-    'ESOV_GA': [
-        ('MMBench_V11', 'acc.csv'), ('MMBench_CN_V11', 'acc.csv'), ('MEGABench_core_64frame', 'score.json'),
-        ('MMStar', 'acc.csv'), ('RealWorldQA', 'acc.csv')
-    ],
-    'ESOV_GO': [
-        ('MMBench_V11', 'acc.csv'), ('MMBench_CN_V11', 'acc.csv'), ('MEGABench_core_16frame', 'score.json'),
-        ('MMStar', 'acc.csv'), ('RealWorldQA', 'acc.csv')
-    ],
-    'ESOV_R': [
-        ('MathVista_MINI', 'gpt-4-turbo_score.csv'), ('MathVision', 'score.csv'), ('MMMU_DEV_VAL', 'acc.csv'),
-        ('LogicVista', 'score.csv'), ('VisuLogic', 'acc.csv')
-    ],
-    'ESOV_I': [
-        ('CCOCR', 'acc.csv'), ('AI2D_TEST', 'acc.csv'), ('SEEDBench2_Plus', 'acc.csv'),
-        ('CharXiv_reasoning_val', 'acc.csv'), ('CharXiv_descriptive_val', 'acc.csv'),
-    ],
-    'ESOV_S': [
-        ('Physics', 'score.csv'), ('MicroVQA', 'acc.csv'), ('MSEarthMCQ', 'acc.csv'),
-        ('SFE', 'score.csv'), ('SFE-zh', 'score.csv'), ('MMSci_DEV_MCQ', 'acc.csv'),
-        ('XLRS-Bench-lite', 'acc.csv'), ('OmniEarth-Bench', 'acc.csv')
     ]
 }
 
@@ -117,7 +96,6 @@ models = {
         'idefics2_8b', 'Bunny-llama3-8B', 'MiniCPM-Llama3-V-2_5', '360VL-70B', 'Phi-3-Vision',
     ] + list(wemm_series),
     '4.44.0': ['Moondream2'],
-    '4.48.0': ['Moondream3'],
     '4.45.0': ['Aria'],
     'latest': ['paligemma-3b-mix-448', 'MiniCPM-V-2_6', 'glm-4v-9b'] + [x for x in llava_series if 'next' in x]
     + list(chameleon_series) + list(ovis_series) + list(mantis_series),
@@ -425,8 +403,6 @@ def EVAL(dataset_name, data_file, **kwargs):
             judge_kwargs['model'] = 'gpt-4o'
         elif listinstr(['DynaMath', 'MathVerse', 'MathVista', 'MathVision'], dataset_name):
             judge_kwargs['model'] = 'gpt-4o-mini'
-        elif listinstr(['SFE'], dataset_name):
-            judge_kwargs['model'] = 'gpt-4o-1120'
     else:
         judge_kwargs['model'] = kwargs['model']
     judge_kwargs['nproc'] = kwargs.get('nproc', 4)
@@ -498,8 +474,7 @@ def SCAN_ONE(root, model, dataset):
     from termcolor import colored
     FAIL_MSG = 'Failed to obtain answer via API.'
     root = osp.join(root, model)
-    pred_format = get_pred_file_format()
-    fname = f'{model}_{dataset}.{pred_format}'
+    fname = f'{model}_{dataset}.xlsx'
     pth = osp.join(root, fname)
     if osp.exists(pth):
         data = load(pth)
@@ -551,8 +526,7 @@ def SCAN(root, models, datasets):
         cur_datasets = []
         if len(datasets) == 0:
             for d in SUPPORTED_DATASETS:
-                pred_format = get_pred_file_format()
-                if osp.exists(osp.join(root, m, f'{m}_{d}.{pred_format}')):
+                if osp.exists(osp.join(root, m, f'{m}_{d}.xlsx')):
                     cur_datasets.append(d)
         else:
             cur_datasets = datasets
@@ -572,11 +546,8 @@ def cli():
 
     if args[0].lower() == 'dlist':
         assert len(args) >= 2
-        res = []
-        for arg in args[1:]:
-            lst = DLIST(arg)
-            res.extend(lst)
-        print(' '.join(res))
+        lst = DLIST(args[1])
+        print(' '.join(lst))
     elif args[0].lower() == 'mlist':
         assert len(args) >= 2
         size = 'all'

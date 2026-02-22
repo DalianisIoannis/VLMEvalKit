@@ -4,7 +4,7 @@ from typing import List, Tuple
 # load_dotenv()
 
 import os
-from ..eval_configs.global_config import run_script_safe
+from eval_configs.global_config import run_script_safe
 
 
 
@@ -66,11 +66,7 @@ class TextEvaluator:
         if os.path.exists(output_file):
             with open(output_file, 'r') as f:
                 texts = f.read()
-                try:
-                    texts = eval(texts)
-                except Exception as e:
-                    print(f"Error evaluating texts: {e}")
-                    print(f"Texts: {texts}")
+                texts = eval(texts)
             os.remove(output_file)
         else:
             texts = []
@@ -170,9 +166,9 @@ def log_function(func):
         y_rel = ( y / object.height / 72 ) * 100
         s = args[4]
 
-        drawed_texts.append( (float(x), float(y), float(x_rel), float(y_rel), s) )
+        drawed_texts.append( (x, y, x_rel, y_rel, s) )
         return func(*args, **kwargs)
-    wrapper.__name__ = func.__name__
+
     return wrapper
 
 RendererPdf.draw_text = log_function(RendererPdf.draw_text)

@@ -271,7 +271,7 @@ class LLaVA_Next(BaseModel):
                     self.model_path,
                     torch_dtype=torch.float16,
                     low_cpu_mem_usage=True,
-                    use_flash_attention_2=True,
+                    # use_flash_attention_2=True,
                 )
         else:
             if "interleave" in model_path.lower():
@@ -521,6 +521,7 @@ class LLaVA_OneVision(BaseModel):
             overwrite=True, mm_spatial_pool_mode="average", force_sample=True
         )
         video_kwargs_default.update(kwargs)
+        # {'overwrite': True, 'mm_spatial_pool_mode': 'average', 'force_sample': True, 'clever_sampling': 'scene_change', 'max_frames': 8}
         self.video_kwargs = video_kwargs_default
 
         overwrite_config = None
@@ -542,6 +543,14 @@ class LLaVA_OneVision(BaseModel):
             device_map="auto",
             overwrite_config=overwrite_config,
         )
+        ##################################################
+        # https://stackoverflow.com/questions/74682597/fine-tuning-gpt2-attention-mask-and-pad-token-id-errors
+        # for facing The attention mask is not set and cannot be inferred from input because pad
+        # token is same as eos token. As a consequence, you may observe unexpected behavior.
+        # Please pass your input's `attention_mask` to obtain reliable results.
+        if tokenizer.pad_token is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        ##################################################
         model.eval()
         model.tie_weights()
 
@@ -578,6 +587,14 @@ class LLaVA_OneVision(BaseModel):
         for msg in message:
             if msg["type"] == "text":
                 content += msg["value"]
+                ####################################
+                # # check if we want something for Multiple Choice specifically
+                # if dataset == 'MMBench_DEV_EN':
+                search_list = ["MMBench_DEV_EN", "Video-MME"]
+                if any(search_string in dataset for search_string in search_list):
+                    content += "Please select the correct answer from the options above. Respond with only the letter (A, B, C, or D) of the correct option."
+
+                ###################################
             else:
                 img = Image.open(msg["value"]).convert("RGB")
                 images.append(img)
@@ -641,7 +658,8 @@ class LLaVA_OneVision(BaseModel):
         )
 
         time_instruciton = (
-            f"The video lasts for {video_time:.2f} seconds,"
+            # f"The video lasts for {video_time:.2f} seconds,"
+            f"The video lasts for {video_time} seconds,"
             f"and {len(video_frames[0])} frames are uniformly sampled from it."
             f"These frames are located at {frame_time}."
             f"Please answer the following questions related to this video.\n"
@@ -686,6 +704,13 @@ class LLaVA_OneVision(BaseModel):
             images=image_tensors,
             image_sizes=image_sizes,  # Pass the image sizes here
             do_sample=False,
+            ##################################################
+            # https://stackoverflow.com/questions/74682597/fine-tuning-gpt2-attention-mask-and-pad-token-id-errors
+            # for facing The attention mask is not set and cannot be inferred from input because pad
+            # token is same as eos token. As a consequence, you may observe unexpected behavior.
+            # Please pass your input's `attention_mask` to obtain reliable results.
+            pad_token_id=self.tokenizer.pad_token_id,
+            ##################################################
             temperature=0,
             max_new_tokens=2048,
             modalities=modalities,
@@ -700,6 +725,14 @@ class LLaVA_OneVision(BaseModel):
 
         if max_frames_num == 0:
             return np.zeros((1, 336, 336, 3))
+        ########################################################
+        if "clever_sampling" in self.video_kwargs:
+            sampling_technique = self.video_kwargs["clever_sampling"]
+            from giannis_stuff.giannis_utils import apply_clever_sampling
+            return apply_clever_sampling(sampling_technique, video_path,
+                                         max_frames=self.video_kwargs["max_frames"],
+                                         sampling_extra_params=self.video_kwargs["sampling_extra_param"])
+        ########################################################
         vr = VideoReader(video_path, ctx=cpu(0), num_threads=1)
         total_frame_num = len(vr)
         video_time = total_frame_num / vr.get_avg_fps()
@@ -719,7 +752,7 @@ class LLaVA_OneVision(BaseModel):
         return spare_frames, frame_time, video_time
 
     def generate_inner(self, message, dataset=None):
-        if DATASET_MODALITY(dataset) == 'VIDEO' and 'megabench' not in dataset.lower():
+        if DATASET_MODALITY(dataset) == 'VIDEO':
             return self.generate_inner_video(message, dataset)
         else:
             return self.generate_inner_image(message, dataset)
@@ -839,7 +872,7 @@ class LLaVA_OneVision_HF(BaseModel):
         return video_frames, frame_time_str, video_time
 
     def generate_inner(self, message, dataset=None):
-        if DATASET_MODALITY(dataset) == "VIDEO" and 'megabench' not in dataset.lower():
+        if DATASET_MODALITY(dataset) == "VIDEO":
             return self.generate_inner_video(message, dataset)
         else:
             return self.generate_inner_image(message, dataset)

@@ -17,7 +17,7 @@ class Spatial457(ImageBaseDataset):
     ROBUST = True
 
     DATASET_URL = {
-        "Spatial457": "https://opencompass.openxlab.space/utils/VLMEval/Spatial457.tsv",
+        "Spatial457": "http://opencompass.openxlab.space/utils/VLMEval/Spatial457.tsv",
     }
 
     DATASET_MD5 = {
@@ -133,7 +133,7 @@ class Spatial457(ImageBaseDataset):
                 all_results[f"{level}_correct"] / all_results[level] if all_results[level] > 0 else 0
             )
 
-        score_pth = get_intermediate_file_path(eval_file, "_score", "json")
+        score_pth = eval_file.replace(".xlsx", "_score.json")
 
         dump(all_results, score_pth)
         return all_results

@@ -36,14 +36,15 @@ class OpenAIWrapper(BaseAPI):
     def __init__(self,
                  model: str = 'gpt-3.5-turbo-0613',
                  retry: int = 5,
+                 wait: int = 5,
                  key: str = None,
                  verbose: bool = False,
                  system_prompt: str = None,
                  temperature: float = 0,
-                 timeout: int = 300,
+                 timeout: int = 60,
                  api_base: str = None,
                  max_tokens: int = 2048,
-                 img_size: int = -1,
+                 img_size: int = 512,
                  img_detail: str = 'low',
                  use_azure: bool = False,
                  **kwargs):
@@ -85,12 +86,6 @@ class OpenAIWrapper(BaseAPI):
             if key is None:
                 key = env_key
             api_base = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-        elif 'ernie' in model:
-            env_key = os.environ.get('BAIDU_API_KEY', '')
-            if key is None:
-                key = env_key
-            api_base = 'https://qianfan.baidubce.com/v2/chat/completions'
-            self.baidu_appid = os.environ.get('BAIDU_APP_ID', None)
         else:
             if use_azure:
                 env_key = os.environ.get('AZURE_OPENAI_API_KEY', None)
@@ -105,6 +100,10 @@ class OpenAIWrapper(BaseAPI):
                 env_key = os.environ.get('OPENAI_API_KEY', '')
                 if key is None:
                     key = env_key
+                assert isinstance(key, str) and key.startswith('sk-'), (
+                    f'Illegal openai_key {key}. '
+                    'Please set the environment variable OPENAI_API_KEY to your openai key. '
+                )
 
         self.key = key
         assert img_size > 0 or img_size == -1
@@ -112,9 +111,9 @@ class OpenAIWrapper(BaseAPI):
         assert img_detail in ['high', 'low']
         self.img_detail = img_detail
         self.timeout = timeout
-        self.is_max_completion_tokens = ('o1' in model) or ('o3' in model) or ('o4' in model) or ('gpt-5' in model)
-        self.is_o_model = ('o1' in model) or ('o3' in model) or ('o4' in model)
-        super().__init__(retry=retry, system_prompt=system_prompt, verbose=verbose, **kwargs)
+        self.o1_model = 'o1' in model or 'o3' in model
+
+        super().__init__(wait=wait, retry=retry, system_prompt=system_prompt, verbose=verbose, **kwargs)
 
         if use_azure:
             api_base_template = (
@@ -149,9 +148,6 @@ class OpenAIWrapper(BaseAPI):
             else:
                 self.logger.error('Unknown API Base. ')
                 raise NotImplementedError
-            if os.environ.get('BOYUE', None):
-                self.api_base = os.environ.get('BOYUE_API_BASE')
-                self.key = os.environ.get('BOYUE_API_KEY')
 
         self.logger.info(f'Using API Base: {self.api_base}; API Key: {self.key}')
 
@@ -203,9 +199,6 @@ class OpenAIWrapper(BaseAPI):
             headers = {'Content-Type': 'application/json', 'Authorization': self.key}
         else:
             headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {self.key}'}
-        if hasattr(self, 'baidu_appid'):
-            headers['appid'] = self.baidu_appid
-
         payload = dict(
             model=self.model,
             messages=input_msgs,
@@ -213,7 +206,7 @@ class OpenAIWrapper(BaseAPI):
             temperature=temperature,
             **kwargs)
 
-        if self.is_max_completion_tokens:
+        if self.o1_model:
             payload['max_completion_tokens'] = max_tokens
             payload.pop('temperature')
         else:
@@ -224,20 +217,9 @@ class OpenAIWrapper(BaseAPI):
             payload.pop('n')
             payload['reasoning_effort'] = 'high'
 
-        proxies = {}
-        if os.getenv('http_proxy'):
-            proxies['http'] = os.getenv('http_proxy')
-        if os.getenv('https_proxy'):
-            proxies['https'] = os.getenv('https_proxy')
-        proxies = proxies or None
-
         response = requests.post(
             self.api_base,
-            headers=headers,
-            data=json.dumps(payload),
-            proxies=proxies,
-            timeout=self.timeout * 1.1,
-        )
+            headers=headers, data=json.dumps(payload), timeout=self.timeout * 1.1)
         ret_code = response.status_code
         ret_code = 0 if (200 <= int(ret_code) < 300) else ret_code
         answer = self.fail_msg

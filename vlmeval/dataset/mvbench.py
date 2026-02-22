@@ -26,7 +26,6 @@ Based on your observations, select the best option that accurately addresses the
 """
 
     TYPE = 'Video-MCQ'
-    DEFAULT_JUDGE = ['chatgpt-0125', 'gpt-4-0125']
 
     def __init__(self, dataset='MVBench', nframe=0, fps=-1):
         self.type_data_list = {
@@ -256,18 +255,13 @@ Based on your observations, select the best option that accurately addresses the
         flag = np.all([osp.exists(p) for p in frame_paths])
 
         if not flag:
-            # 建议锁文件以 video_name 命名
-            lock_path = osp.join(self.frame_root, f'{video_name}.lock')
-            with portalocker.Lock(lock_path, 'w', timeout=30):
-                # 锁内再判断一次，防止重复写
-                if not np.all([osp.exists(p) for p in frame_paths]):
-                    block_size = imgs.size(0) // frames
-                    split_tensors = torch.split(imgs, block_size)
-                    to_pil = transforms.ToPILImage()
-                    images = [to_pil(arr) for arr in split_tensors]
-                    for im, pth in zip(images, frame_paths):
-                        if not osp.exists(pth):
-                            im.save(pth)
+            block_size = imgs.size(0) // frames
+            split_tensors = torch.split(imgs, block_size)
+            to_pil = transforms.ToPILImage()
+            images = [to_pil(arr) for arr in split_tensors]
+            for im, pth in zip(images, frame_paths):
+                if not osp.exists(pth):
+                    im.save(pth)
 
         return frame_paths
 
@@ -363,23 +357,27 @@ Based on your observations, select the best option that accurately addresses the
     @classmethod
     def evaluate(self, eval_file, **judge_kwargs):
 
-        assert get_file_extension(eval_file) in ['xlsx', 'json', 'tsv'], 'data file should be an supported format (xlsx/json/tsv) file'  # noqa: E501
+        assert eval_file.endswith('.xlsx'), 'data file should be an xlsx file'
 
-        tmp_file = get_intermediate_file_path(eval_file, '_tmp', 'pkl')
-        tgt_file = get_intermediate_file_path(eval_file, '_rating', 'json')
-        score_file = get_intermediate_file_path(eval_file, '_score')
+        tmp_file = eval_file.replace('.xlsx', '_tmp.pkl')
+        tgt_file = eval_file.replace('.xlsx', '_rating.json')
+        score_file = eval_file.replace('.xlsx', '_score.xlsx')
 
         if not osp.exists(score_file):
             model = judge_kwargs.setdefault('model', 'chatgpt-0125')
+            assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
 
             if model == 'exact_matching':
                 model = None
-            else:
+            elif gpt_key_set():
                 model = build_judge(**judge_kwargs)
                 if not model.working():
                     warnings.warn('OPENAI API is not working properly, will use exact matching for evaluation')
                     warnings.warn(DEBUG_MESSAGE)
                     model = None
+            else:
+                warnings.warn('OPENAI_API_KEY is not set properly, will use exact matching for evaluation')
+                model = None
             res = {} if not osp.exists(tmp_file) else load(tmp_file)
             res = {k: v for k, v in res.items() if FAIL_MSG not in v}
 
@@ -426,7 +424,6 @@ Based on your observations, select the best option that accurately addresses the
 
 
 class MVBench_MP4(VideoBaseDataset):
-    DEFAULT_JUDGE = ['chatgpt-0125', 'gpt-4-0125']
 
     MP4_MD5 = '5c8c6f8b7972c2de65a629590f7c42f5'
     SYS = """Carefully watch the video and pay attention to the cause and sequence of events, \
@@ -562,16 +559,13 @@ Based on your observations, select the best option that accurately addresses the
         flag = np.all([osp.exists(p) for p in frame_paths])
 
         if not flag:
-            lock_path = osp.join(self.frame_root, f'{video_name}.lock')
-            with portalocker.Lock(lock_path, 'w', timeout=30):
-                if not np.all([osp.exists(p) for p in frame_paths]):
-                    block_size = imgs.size(0) // frames
-                    split_tensors = torch.split(imgs, block_size)
-                    to_pil = transforms.ToPILImage()
-                    images = [to_pil(arr) for arr in split_tensors]
-                    for im, pth in zip(images, frame_paths):
-                        if not osp.exists(pth):
-                            im.save(pth)
+            block_size = imgs.size(0) // frames
+            split_tensors = torch.split(imgs, block_size)
+            to_pil = transforms.ToPILImage()
+            images = [to_pil(arr) for arr in split_tensors]
+            for im, pth in zip(images, frame_paths):
+                if not osp.exists(pth):
+                    im.save(pth)
 
         return frame_paths
 
@@ -607,23 +601,27 @@ Based on your observations, select the best option that accurately addresses the
     @classmethod
     def evaluate(self, eval_file, **judge_kwargs):
 
-        assert get_file_extension(eval_file) in ['xlsx', 'json', 'tsv'], 'data file should be an supported format (xlsx/json/tsv) file'  # noqa: E501
+        assert eval_file.endswith('.xlsx'), 'data file should be an xlsx file'
 
-        tmp_file = get_intermediate_file_path(eval_file, '_tmp', 'pkl')
-        tgt_file = get_intermediate_file_path(eval_file, '_rating', 'json')
-        score_file = get_intermediate_file_path(eval_file, '_score')
+        tmp_file = eval_file.replace('.xlsx', '_tmp.pkl')
+        tgt_file = eval_file.replace('.xlsx', '_rating.json')
+        score_file = eval_file.replace('.xlsx', '_score.xlsx')
 
         if not osp.exists(score_file):
             model = judge_kwargs.setdefault('model', 'chatgpt-0125')
+            assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
 
             if model == 'exact_matching':
                 model = None
-            else:
+            elif gpt_key_set():
                 model = build_judge(**judge_kwargs)
                 if not model.working():
                     warnings.warn('OPENAI API is not working properly, will use exact matching for evaluation')
                     warnings.warn(DEBUG_MESSAGE)
                     model = None
+            else:
+                warnings.warn('OPENAI_API_KEY is not set properly, will use exact matching for evaluation')
+                model = None
             res = {} if not osp.exists(tmp_file) else load(tmp_file)
             res = {k: v for k, v in res.items() if FAIL_MSG not in v}
 

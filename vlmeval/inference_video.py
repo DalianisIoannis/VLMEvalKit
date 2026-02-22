@@ -43,20 +43,9 @@ def infer_data_api(model, work_dir, model_name, dataset, samples_dict={}, api_np
               'will set its VIDEO_LLM to False to enable multi-image input for video.')
         setattr(model, 'VIDEO_LLM', False)
 
-    packstr = 'pack' if getattr(dataset, 'pack', False) else 'nopack'
-    build_prompt_input = [(samples_dict[idx], getattr(model, 'VIDEO_LLM', False)) for idx in indices]
-    if dataset.nframe > 0:
-        struct_tmp_file = f'{work_dir}/{model_name}_{dataset_name}_{dataset.nframe}frame_{packstr}_structs.pkl'
-    else:
-        struct_tmp_file = f'{work_dir}/{model_name}_{dataset_name}_{dataset.fps}fps_{packstr}_structs.pkl'
-    structs = track_progress_rich(
-        dataset.build_prompt,
-        tasks=build_prompt_input,
-        nproc=api_nproc,
-        save=struct_tmp_file,
-        keys=indices,
-    )
+    structs = [dataset.build_prompt(samples_dict[idx], video_llm=getattr(model, 'VIDEO_LLM', False)) for idx in indices]
 
+    packstr = 'pack' if getattr(dataset, 'pack', False) else 'nopack'
     if dataset.nframe > 0:
         out_file = f'{work_dir}/{model_name}_{dataset_name}_{dataset.nframe}frame_{packstr}_supp.pkl'
     else:
@@ -64,7 +53,6 @@ def infer_data_api(model, work_dir, model_name, dataset, samples_dict={}, api_np
     res = load(out_file) if osp.exists(out_file) else {}
 
     structs = [s for i, s in zip(indices, structs) if i not in res or res[i] == FAIL_MSG]
-    structs = [struct for struct in structs if struct is not None]
     indices = [i for i in indices if i not in res or res[i] == FAIL_MSG]
 
     gen_func = model.generate
@@ -77,7 +65,10 @@ def infer_data_api(model, work_dir, model_name, dataset, samples_dict={}, api_np
     return res
 
 
-def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, api_nproc=4, use_vllm=False):
+def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, api_nproc=4, use_vllm=False,
+               ###########################################################
+               clever_sampling=None, max_frames=8, sampling_extra_param=None):
+               ###########################################################
     res = load(out_file) if osp.exists(out_file) else {}
     rank, world_size = get_rank_and_world_size()
     dataset_name = dataset.dataset_name
@@ -99,6 +90,12 @@ def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, ap
         or 'Qwen2.5-Omni' in model_name
     ):
         kwargs = {'use_vllm': use_vllm}
+    ###########################################################
+    if clever_sampling is not None:
+        kwargs['clever_sampling'] = clever_sampling
+        kwargs['max_frames'] = max_frames
+        kwargs['sampling_extra_param'] = sampling_extra_param
+    ###########################################################
 
     # (25.06.05) In newer version of transformers (after 4.50), with device_map='auto' and torchrun launcher,
     # Transformers automatically adopt TP parallelism, which leads to compatibility problems with VLMEvalKit
@@ -126,16 +123,10 @@ def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, ap
         return model
 
     assert not getattr(dataset, 'pack', False), 'Current model not supported pack mode!'
-    if 'megabench' in dataset_name.lower() and 'llava_onevision' in model_name:
-        print(
-            'LLaVA-OneVision does not support Megabench dataset as video dataset, '
-            'will set its VIDEO_LLM to False to enable multi-image input for video.'
-        )
-        setattr(model, 'VIDEO_LLM', False)
-
     for i, idx in tqdm(enumerate(sample_indices_subrem)):
         if idx in res:
             continue
+        # HERE IT HAS TO DO WITH THE FRAMES
         if getattr(model, 'nframe', None) is not None and getattr(model, 'nframe', 0) > 0:
             if dataset.nframe > 0:
                 if getattr(model, 'nframe', 0) != dataset.nframe:
@@ -175,8 +166,6 @@ def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, ap
             struct = dataset.build_prompt(
                 sample_map[idx], video_llm=getattr(model, 'VIDEO_LLM', False)
             )
-        if struct is None:
-            continue
 
         # If `SKIP_ERR` flag is set, the model will skip the generation if error is encountered
         if os.environ.get('SKIP_ERR', False) == '1':
@@ -212,7 +201,12 @@ def infer_data_job_video(
         result_file_name,
         verbose=False,
         api_nproc=4,
-        use_vllm=False):
+        use_vllm=False,
+        #######################################################
+        clever_sampling=None,
+        max_frames=8,
+        sampling_extra_param=None):
+        #######################################################
 
     dataset_name = dataset.dataset_name
     rank, world_size = get_rank_and_world_size()
@@ -232,7 +226,12 @@ def infer_data_job_video(
         out_file=out_file,
         verbose=verbose,
         api_nproc=api_nproc,
-        use_vllm=use_vllm)
+        #######################################################
+        use_vllm=use_vllm,
+        clever_sampling=clever_sampling,
+        max_frames=max_frames,
+        sampling_extra_param=sampling_extra_param)
+        #######################################################
 
     if world_size > 1:
         dist.barrier()

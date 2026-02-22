@@ -5,7 +5,6 @@ from .utils.judge_util import build_judge
 from .image_base import ImageBaseDataset
 from .mmlongbench import concat_images, MMLongBench_auxeval, anls_compute
 from ..smp import *
-from ..smp.file import get_intermediate_file_path
 
 
 FAIL_MSG = 'Failed to obtain answer via API.'
@@ -166,8 +165,9 @@ class DUDE(ImageBaseDataset):
         logger = get_logger('Evaluation')
         model = judge_kwargs['model']
 
-        storage = get_intermediate_file_path(eval_file, f'_{model}')
-        tmp_file = get_intermediate_file_path(eval_file, f'_{model}', 'pkl')
+        suffix = eval_file.split('.')[-1]
+        storage = eval_file.replace(f'.{suffix}', f'_{model}.xlsx')
+        tmp_file = eval_file.replace(f'.{suffix}', f'_{model}.pkl')
 
         if osp.exists(storage):
             logger.warning(f'GPT scoring file {storage} already exists, will reuse it in DUDE_eval. ')
@@ -203,7 +203,7 @@ class DUDE(ImageBaseDataset):
             dump(data, storage)
 
         score = DUDE_acc(storage)
-        score_pth = get_intermediate_file_path(storage, '_score', 'csv')
+        score_pth = storage.replace('.xlsx', '_score.csv')
 
         dump(score, score_pth)
         logger.info(f'DUDE successfully finished evaluating {eval_file}, results saved in {score_pth}')

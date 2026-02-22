@@ -131,7 +131,6 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-environment.yml
 
 # Spyder project settings
 .spyderproject
@@ -205,14 +204,30 @@ Qwen*
 CongRong*
 Seed1.5*
 aguvis*
-grok-*
-GLM4.5*
-SenseNova*
+grok-2-vision*
 
-.DS_Store
+vlmeval/vlm/llava_next_vido
+.env_*
+!config.json
 
-temp
-result*
-debug
-outputs
-scripts/data
+plots
+
+# Credentials and tokens
+.env
+*.env
+.cache/huggingface/token
+**/*token*
+**/*key*
+
+# Personal outputs
+outputs/
+giannis_stuff/runner_logs/
+giannis_stuff/plots/*.pdf
+
+# Virtual environments
+.env_*/
+*.venv/
+
+# Personal notes (if applicable)
+*personal*
+*private*

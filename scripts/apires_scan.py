@@ -10,9 +10,7 @@ if root[-1] in '/\\':
 model_name = root.split('/')[-1]
 
 for d in SUPPORTED_DATASETS:
-    from vlmeval.smp import get_pred_file_format
-    pred_format = get_pred_file_format()
-    fname = f'{model_name}_{d}.{pred_format}'
+    fname = f'{model_name}_{d}.xlsx'
     pth = osp.join(root, fname)
     if osp.exists(pth):
         data = load(pth)

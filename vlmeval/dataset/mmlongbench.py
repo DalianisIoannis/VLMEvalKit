@@ -7,7 +7,6 @@ import torchvision.transforms as transforms
 from vlmeval.dataset.utils import build_judge, levenshtein_distance
 from vlmeval.smp import *
 from .image_base import ImageBaseDataset
-from ..smp.file import get_intermediate_file_path
 
 FAIL_MSG = 'Failed to obtain answer via API.'
 
@@ -195,7 +194,7 @@ def isfloat(num):
 
 def get_font():
     try:
-        truetype_url = "https://opencompass.openxlab.space/utils/Fonts/SimHei.ttf"
+        truetype_url = "http://opencompass.openxlab.space/utils/Fonts/SimHei.ttf"
         ff = urlopen(truetype_url)
         font = ImageFont.truetype(ff, size=40)
     except Exception as e:
@@ -429,7 +428,7 @@ class MMLongBench(ImageBaseDataset):
         'MMLongBench_DOC': 'https://opencompass.openxlab.space/utils/VLMEval/MMLongBench_DOC.tsv',
     }
     DATASET_MD5 = {
-        'MMLongBench_DOC': '75f5d29965d0db68254993f6170da7c2',
+        'MMLongBench_DOC': '9b393e1f4c52718380d50586197eac9b',
     }
 
     SUPPORTED_MODELS = {
@@ -539,8 +538,9 @@ class MMLongBench(ImageBaseDataset):
         logger = get_logger('Evaluation')
         model = judge_kwargs['model']
 
-        storage = get_intermediate_file_path(eval_file, f'_{model}')
-        tmp_file = get_intermediate_file_path(eval_file, f'_{model}', 'pkl')
+        suffix = eval_file.split('.')[-1]
+        storage = eval_file.replace(f'.{suffix}', f'_{model}.xlsx')
+        tmp_file = eval_file.replace(f'.{suffix}', f'_{model}.pkl')
 
         if osp.exists(storage):
             logger.warning(f'GPT scoring file {storage} already exists, will reuse it in MMLongBench_eval. ')
@@ -576,7 +576,7 @@ class MMLongBench(ImageBaseDataset):
             dump(data, storage)
 
         score = MMLongBench_acc(storage)
-        score_pth = get_intermediate_file_path(storage, '_score', 'csv')
+        score_pth = storage.replace('.xlsx', '_score.csv')
 
         dump(score, score_pth)
         logger.info(f'MMLongBench_eval successfully finished evaluating {eval_file}, results saved in {score_pth}')

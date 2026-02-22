@@ -4,7 +4,6 @@ from .utils import build_judge
 from .utils.multiple_choice import report_acc, eval_vanilla, eval_circular_group
 from .utils.shortqa import ShortQA_prompt
 from ..utils import track_progress_rich
-from ..smp.file import get_intermediate_file_path
 
 
 def ShortQA_auxeval(model, line):
@@ -90,8 +89,8 @@ class ImageShortQADataset(ImageBaseDataset):
         data['prediction'] = [str(x) for x in data['prediction']]
         data['answer'] = [str(x) for x in data['answer']]
 
-        storage = get_intermediate_file_path(eval_file, '_judge')
-        tmp_file = get_intermediate_file_path(eval_file, '_tmp', 'pkl')
+        storage = eval_file.replace('.xlsx', '_judge.xlsx')
+        tmp_file = eval_file.replace('.xlsx', '_tmp.pkl')
         nproc = judge_kwargs.pop('nproc', 4)
 
         if not osp.exists(storage):
@@ -100,12 +99,15 @@ class ImageShortQADataset(ImageBaseDataset):
             model = judge_kwargs.get('model', 'gpt-4o-mini')
             if model == 'exact_matching':
                 model = None
-            else:
+            elif gpt_key_set():
                 model = build_judge(model=model, **judge_kwargs)
                 if not model.working():
                     warnings.warn('OPENAI API is not working properly, will use exact matching for evaluation')
                     warnings.warn(DEBUG_MESSAGE)
                     model = None
+            else:
+                model = None
+                warnings.warn('OPENAI_API_KEY is not working properly, will use exact matching for evaluation')
 
             if model is not None:
                 if 'g_index' not in data:
@@ -135,7 +137,7 @@ class ImageShortQADataset(ImageBaseDataset):
         data = load(storage)
         acc = report_acc(data)
 
-        score_file = get_intermediate_file_path(eval_file, '_acc', 'csv')
+        score_file = eval_file.replace('.xlsx', '_acc.csv')
         dump(acc, score_file)
         return acc
 

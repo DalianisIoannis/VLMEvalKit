@@ -110,7 +110,6 @@ class InternVLChat(BaseModel):
 
     def __init__(self,
                  model_path='OpenGVLab/InternVL-Chat-V1-5',
-                 use_custom_prompt=True,
                  load_in_8bit=False,
                  use_mpo_prompt=False,
                  version='V1.0',
@@ -134,7 +133,6 @@ class InternVLChat(BaseModel):
         self.use_mpo_prompt = use_mpo_prompt
         self.use_cot = (os.getenv('USE_COT') == '1')
         self.use_postprocess = use_postprocess
-        self._use_custom_prompt = use_custom_prompt
 
         if cot_prompt_version == 'r1':
             self.system_prompt = R1_SYSTEM_PROMPT
@@ -175,18 +173,14 @@ class InternVLChat(BaseModel):
         self.screen_parse = screen_parse
 
         if use_lmdeploy:
-            from lmdeploy import TurbomindEngineConfig, PytorchEngineConfig, VisionConfig, pipeline
-            engine_type = PytorchEngineConfig if "internvl3_5" in model_path.lower() else TurbomindEngineConfig
+            from lmdeploy import TurbomindEngineConfig, VisionConfig, pipeline, ChatTemplateConfig
             vision_config = VisionConfig(max_batch_size=4)
             num_gpus = torch.cuda.device_count()
             self.model = pipeline(
                 model_path,
                 vision_config=vision_config,
-                backend_config=engine_type(
-                    session_len=max(16384, kwargs.get("max_new_tokens", 16384)),
-                    cache_max_entry_count=0.5,
-                    tp=num_gpus,
-                )
+                chat_template_config=ChatTemplateConfig(model_name='internvl2_5'),
+                backend_config=TurbomindEngineConfig(session_len=16384, cache_max_entry_count=0.1, tp=num_gpus)
             )
             torch.cuda.set_device(0)
             self.device = 'cuda'
@@ -194,6 +188,7 @@ class InternVLChat(BaseModel):
             self.model = AutoModel.from_pretrained(
                 model_path,
                 torch_dtype=torch.bfloat16,
+                load_in_8bit=load_in_8bit,
                 trust_remote_code=True,
                 low_cpu_mem_usage=True,
                 device_map="auto").eval()
@@ -208,6 +203,7 @@ class InternVLChat(BaseModel):
             self.reward_model = AutoModel.from_pretrained(
                 reward_model_path,
                 torch_dtype=torch.bfloat16,
+                load_in_8bit=load_in_8bit,
                 trust_remote_code=True,
                 low_cpu_mem_usage=True,
                 device_map="auto").eval()
@@ -229,21 +225,15 @@ class InternVLChat(BaseModel):
         warnings.warn(f'Following kwargs received: {self.kwargs}, will use as generation config. ')
 
     def use_custom_prompt(self, dataset):
-        if not self._use_custom_prompt:
-            return False
-
         assert dataset is not None
         if dataset in [
             'atomic_dataset', 'electro_dataset', 'mechanics_dataset',
             'optics_dataset', 'quantum_dataset', 'statistics_dataset'
         ]:
             return False
-        if listinstr(['MMDU', 'MME-RealWorld', 'MME-RealWorld-CN', 'WeMath_COT', 'MMAlignBench', 'ChartQAPro', 'ChartMuseum', 'MMSIVideo_U50','MMSIVideo_SC'], dataset):  # noqa: E501
+        if listinstr(['MMDU', 'MME-RealWorld', 'MME-RealWorld-CN', 'WeMath_COT', 'MMAlignBench'], dataset):
             # For Multi-Turn we don't have custom prompt
             return False
-        if DATASET_TYPE(dataset) == 'MCQ':
-            if dataset is not None and 'LEGO' in dataset:
-                return False
         if DATASET_MODALITY(dataset) == 'VIDEO':
             # For Video benchmarks we don't have custom prompt at here
             return False
@@ -255,10 +245,15 @@ class InternVLChat(BaseModel):
 
         assert self.use_custom_prompt(dataset)
         assert dataset is None or isinstance(dataset, str)
-        tgt_path = self.dump_image(line, dataset)
-        if dataset is not None and listinstr(['BMMR'], dataset):
-            self.kwargs['max_new_tokens'] = max(self.kwargs.get('max_new_tokens', 4096), 8196)
-            print(f'[Warning] BMMR dataset requires a larger max_new_tokens, set to {self.kwargs["max_new_tokens"]}')
+        # if dataset is not ChartMimic, dump image (assert "image_path" in line)
+        if not listinstr(['ChartMimic'], dataset):
+            tgt_path = self.dump_image(line, dataset)
+        else:
+            input_figure_path_rel = line["input_figure"]
+            ROOT = LMUDataRoot()
+            img_root = os.path.join(ROOT, 'images', 'ChartMimic')
+            input_figure_path = os.path.join(img_root, input_figure_path_rel)
+            tgt_path = [input_figure_path]
 
         if dataset is not None and DATASET_TYPE(dataset) == 'Y/N':
             question = line['question']
@@ -279,14 +274,9 @@ class InternVLChat(BaseModel):
             elif listinstr(['OCRVQA', 'TextVQA', 'ChartQA', 'DocVQA', 'InfoVQA', 'OCRBench',
                             'DUDE', 'SLIDEVQA', 'GQA', 'MMLongBench_DOC'], dataset):
                 prompt = question + '\nAnswer the question using a single word or phrase.'
-            elif listinstr(['MathVerse'], dataset):
-                question = question.replace("please directly answer the question and", "please")
-                prompt = question
-                if os.getenv('USE_COT') == '1':
-                    prompt = build_qa_cot_prompt(line, prompt, self.cot_prompt)
-            elif listinstr(['MathVista', 'MathVision', 'VCR', 'MTVQA', 'MMVet',
+            elif listinstr(['MathVista', 'MathVision', 'VCR', 'MTVQA', 'MMVet', 'MathVerse',
                             'MMDU', 'CRPE', 'MIA-Bench', 'MM-Math', 'DynaMath', 'QSpatial',
-                            'WeMath', 'LogicVista', 'MM-IFEval', 'ChartMimic', 'MMReason'], dataset):
+                            'WeMath', 'LogicVista', 'MM-IFEval', 'ChartMimic'], dataset):
                 prompt = question
                 if os.getenv('USE_COT') == '1':
                     prompt = build_qa_cot_prompt(line, prompt, self.cot_prompt)
@@ -331,7 +321,7 @@ class InternVLChat(BaseModel):
             self.max_num = 6
             return None
         res_12_datasets = ['ChartQA_TEST', 'MMMU_DEV_VAL', 'MMMU_TEST', 'MME-RealWorld',
-                           'VCR_EN', 'VCR_ZH', 'OCRVQA', 'BMMR']
+                           'VCR_EN', 'VCR_ZH', 'OCRVQA']
         res_18_datasets = ['DocVQA_VAL', 'DocVQA_TEST', 'DUDE', 'MMLongBench_DOC', 'SLIDEVQA']
         res_24_datasets = ['InfoVQA_VAL', 'InfoVQA_TEST', 'OCRBench', 'HRBench4K', 'HRBench8K']
         if DATASET_MODALITY(dataset) == 'VIDEO':
@@ -423,8 +413,8 @@ class InternVLChat(BaseModel):
         response_list = []
         for idx in range(self.best_of_n):
             kwargs_default = self.kwargs.copy()
-            kwargs_default['do_sample'] = idx > 0 or kwargs_default.get('do_sample', False)
-            kwargs_default['temperature'] = 0.6
+            kwargs_default['do_sample'] = idx > 0
+            kwargs_default['temperature'] = 0.7
             kwargs_default['top_p'] = 0.95
 
             if self.use_lmdeploy:

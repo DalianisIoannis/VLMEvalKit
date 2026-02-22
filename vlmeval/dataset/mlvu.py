@@ -1,7 +1,6 @@
 import huggingface_hub
 from huggingface_hub import snapshot_download
 from ..smp import *
-from ..smp.file import get_intermediate_file_path
 from .video_concat_dataset import ConcatVideoDataset
 from .video_base import VideoBaseDataset
 from .utils import build_judge, DEBUG_MESSAGE
@@ -24,7 +23,7 @@ class MLVU(ConcatVideoDataset):
     def __init__(self, dataset='MLVU', nframe=0, fps=-1):
         self.DATASET_SETS[dataset] = ['MLVU_MCQ', 'MLVU_OpenEnded']
         self.type_data_dict = {
-            'M-Avg':['plotQA', 'needle', 'ego', 'count', 'anomaly_reco', 'topic_reasoning', 'order'],
+            'M-Avg':['plotQA', 'needle', 'ego', 'count', 'anomaly_reco', 'topic_reasoning'],
             'G-Avg':['sub_scene', 'summary']
         }
         super().__init__(dataset=dataset, nframe=nframe, fps=fps)
@@ -35,7 +34,8 @@ class MLVU(ConcatVideoDataset):
 
     def evaluate(self, eval_file, **judge_kwargs):
         result = super().evaluate(eval_file=eval_file, **judge_kwargs)
-        score_file = get_intermediate_file_path(eval_file, '_acc')
+        suffix = eval_file.split('.')[-1]
+        score_file = eval_file.replace(f'.{suffix}', '_acc.csv')
         for key in self.type_data_dict:
             result.loc[key] = 0.0
             for name, item in result.iterrows():
@@ -61,7 +61,6 @@ class MLVU_MCQ(VideoBaseDataset):
     BASE_SYS = 'Carefully watch this video and pay attention to every detail. '
     SYS = BASE_SYS + 'Based on your observations, select the best option that accurately addresses the question.'
     TYPE = 'Video-MCQ'
-    DEFAULT_JUDGE = ['chatgpt-0125', 'gpt-4-0125']
 
     def __init__(self, dataset='MLVU_MCQ', nframe=0, fps=-1):
         self.type_data_list = {
@@ -177,14 +176,11 @@ class MLVU_MCQ(VideoBaseDataset):
         flag = np.all([osp.exists(p) for p in frame_paths])
 
         if not flag:
-            lock_path = osp.splitext(vid_path)[0] + '.lock'
-            with portalocker.Lock(lock_path, 'w', timeout=30):
-                if not np.all([osp.exists(p) for p in frame_paths]):
-                    images = [vid[i].asnumpy() for i in indices]
-                    images = [Image.fromarray(arr) for arr in images]
-                    for im, pth in zip(images, frame_paths):
-                        if not osp.exists(pth):
-                            im.save(pth)
+            images = [vid[i].asnumpy() for i in indices]
+            images = [Image.fromarray(arr) for arr in images]
+            for im, pth in zip(images, frame_paths):
+                if not osp.exists(pth):
+                    im.save(pth)
 
         return frame_paths
 
@@ -212,22 +208,26 @@ class MLVU_MCQ(VideoBaseDataset):
 
     @classmethod
     def evaluate(self, eval_file, **judge_kwargs):
-        assert get_file_extension(eval_file) in ['xlsx', 'json', 'tsv'], 'data file should be an supported format (xlsx/json/tsv) file'  # noqa: E501
+        assert eval_file.endswith('.xlsx'), 'data file should be an xlsx file'
 
-        tmp_file = get_intermediate_file_path(eval_file, '_tmp', 'pkl')
-        score_file = get_intermediate_file_path(eval_file, '_score')
+        tmp_file = eval_file.replace('.xlsx', '_tmp.pkl')
+        score_file = eval_file.replace('.xlsx', '_score.xlsx')
 
         if not osp.exists(score_file):
             model = judge_kwargs.setdefault('model', 'chatgpt-0125')
+            assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
 
             if model == 'exact_matching':
                 model = None
-            else:
+            elif gpt_key_set():
                 model = build_judge(**judge_kwargs)
                 if not model.working():
                     warnings.warn('OPENAI API is not working properly, will use exact matching for evaluation')
                     warnings.warn(DEBUG_MESSAGE)
                     model = None
+            else:
+                warnings.warn('OPENAI_API_KEY is not set properly, will use exact matching for evaluation')
+                model = None
             res = {} if not osp.exists(tmp_file) else load(tmp_file)
             res = {k: v for k, v in res.items() if FAIL_MSG not in v}
 
@@ -380,14 +380,11 @@ class MLVU_OpenEnded(VideoBaseDataset):
         flag = np.all([osp.exists(p) for p in frame_paths])
 
         if not flag:
-            lock_path = osp.splitext(vid_path)[0] + '.lock'
-            with portalocker.Lock(lock_path, 'w', timeout=30):
-                if not np.all([osp.exists(p) for p in frame_paths]):
-                    images = [vid[i].asnumpy() for i in indices]
-                    images = [Image.fromarray(arr) for arr in images]
-                    for im, pth in zip(images, frame_paths):
-                        if not osp.exists(pth):
-                            im.save(pth)
+            images = [vid[i].asnumpy() for i in indices]
+            images = [Image.fromarray(arr) for arr in images]
+            for im, pth in zip(images, frame_paths):
+                if not osp.exists(pth):
+                    im.save(pth)
 
         return frame_paths
 
@@ -420,8 +417,9 @@ class MLVU_OpenEnded(VideoBaseDataset):
             print('MLVU Open Ended default using gpt-4-0125! So judge model is changed to gpt-4-0125')
             judge_kwargs['model'] = 'gpt-4-0125'
 
-        score_file = get_intermediate_file_path(eval_file, f'_{model}_score')
-        tmp_file = get_intermediate_file_path(eval_file, f'_{model}', 'pkl')
+        suffix = eval_file.split('.')[-1]
+        score_file = eval_file.replace(f'.{suffix}', f'_{model}_score.xlsx')
+        tmp_file = eval_file.replace(f'.{suffix}', f'_{model}.pkl')
         nproc = judge_kwargs.pop('nproc', 4)
 
         if not osp.exists(score_file):

@@ -1,19 +1,22 @@
 from __future__ import annotations
+
 import os
 import sys
 import warnings
 import math
 import logging
-import json
 
 import torch
 from transformers import StoppingCriteria
-from huggingface_hub import snapshot_download
 
 from ..base import BaseModel
 from .prompt import Qwen2VLPromptMixin
-from ...smp import get_gpu_memory, listinstr, get_cache_path
+from ...smp import get_gpu_memory, listinstr
 from ...dataset import DATASET_MODALITY
+
+from PIL import Image
+from typing import Optional
+import numpy as np
 
 VLLM_MAX_IMAGE_INPUT_NUM = 24
 
@@ -188,7 +191,6 @@ class Qwen2VLChat(Qwen2VLPromptMixin, BaseModel):
         top_k=1,
         temperature=0.01,
         repetition_penalty=1.0,
-        do_sample: bool = True,
         use_custom_prompt: bool = True,
         system_prompt: str | None = None,
         post_process: bool = False,  # if True, will try to only extract stuff in the last \boxed{}.
@@ -197,6 +199,10 @@ class Qwen2VLChat(Qwen2VLPromptMixin, BaseModel):
         **kwargs,
     ):
         super().__init__(use_custom_prompt=use_custom_prompt)
+        ############################################################
+        # useful for clever sampling
+        self.kwargs = kwargs
+        ############################################################
         self.min_pixels = min_pixels
         self.max_pixels = max_pixels
         self.total_pixels = total_pixels
@@ -209,7 +215,6 @@ class Qwen2VLChat(Qwen2VLPromptMixin, BaseModel):
             top_k=top_k,
             temperature=temperature,
             repetition_penalty=repetition_penalty,
-            do_sample=do_sample,
         )
         self.system_prompt = system_prompt
         self.verbose = verbose
@@ -222,45 +227,26 @@ class Qwen2VLChat(Qwen2VLPromptMixin, BaseModel):
                   the fps/nframe setting in video dataset is omitted")
         self.use_audio_in_video = use_audio_in_video
         self.FRAME_FACTOR = 2
-
         assert model_path is not None
-
-        if not os.path.exists(model_path):
-            cache_path = get_cache_path(model_path, repo_type='models')
-            if cache_path is None:
-                snapshot_download(repo_id=model_path)
-                cache_path = get_cache_path(model_path, repo_type='models')
-            model_path = cache_path
-
         self.model_path = model_path
-
         MODEL_CLS = None
 
-        cfg_json_path = os.path.join(self.model_path, 'config.json')
-        assert cfg_json_path is not None, 'Qwen series models require a config.json file to specify the architecture.'
-
-        with open(cfg_json_path, 'r', encoding='utf-8') as f:
-            cfg = json.load(f)
-            architectures = str(cfg.get("architectures", None)).lower()
-
-        if listinstr(['omni'], architectures):
+        if listinstr(['omni'], model_path.lower()):
             try:
                 from transformers import Qwen2_5OmniForConditionalGeneration, Qwen2_5OmniProcessor
             except Exception as err:
                 logging.critical("pip install git+https://github.com/huggingface/transformers@3a1ead0aabed473eafe527915eea8c197d424356")  # noqa: E501
                 raise err
             MODEL_CLS = Qwen2_5OmniForConditionalGeneration
-            self.processor = Qwen2_5OmniProcessor.from_pretrained(self.model_path)
-
-        elif listinstr(['qwen2_5'], architectures):
+            self.processor = Qwen2_5OmniProcessor.from_pretrained(model_path)
+        elif listinstr(['2.5', '2_5', 'qwen25', 'mimo'], model_path.lower()):
             from transformers import Qwen2_5_VLForConditionalGeneration, AutoProcessor
             MODEL_CLS = Qwen2_5_VLForConditionalGeneration
-            self.processor = AutoProcessor.from_pretrained(self.model_path)
-
+            self.processor = AutoProcessor.from_pretrained(model_path)
         else:
             from transformers import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
             MODEL_CLS = Qwen2VLForConditionalGeneration
-            self.processor = Qwen2VLProcessor.from_pretrained(self.model_path)
+            self.processor = Qwen2VLProcessor.from_pretrained(model_path)
 
         gpu_mems = get_gpu_memory()
         max_gpu_mem = max(gpu_mems) if gpu_mems != [] else -1
@@ -284,6 +270,7 @@ class Qwen2VLChat(Qwen2VLPromptMixin, BaseModel):
             logging.info(
                 f'Using vLLM for {self.model_path} inference with {tp_size} GPUs (available: {gpu_count})'
             )
+            import os
             if os.environ.get('VLLM_WORKER_MULTIPROC_METHOD') != 'spawn':
                 logging.warning(
                     'VLLM_WORKER_MULTIPROC_METHOD is not set to spawn.'
@@ -303,8 +290,8 @@ class Qwen2VLChat(Qwen2VLPromptMixin, BaseModel):
             num_gpus = torch.cuda.device_count()
             self.model = pipeline(
                 model_path,
-                backend_config=TurbomindEngineConfig(session_len=32768, cache_max_entry_count=0.1, tp=num_gpus),
-                chat_template_config=ChatTemplateConfig(model_name='qwen2d5-vl'))
+                backend_config=TurbomindEngineConfig(session_len=32768, cache_max_entry_count=0.1, tp=num_gpus)
+            )
             torch.cuda.set_device(0)
             self.device = 'cuda'
         else:
@@ -456,6 +443,94 @@ class Qwen2VLChat(Qwen2VLPromptMixin, BaseModel):
                 raise ValueError(f"Invalid message type: {s['type']}, {s}")
         return content
 
+    def extract_vision_info(self, conversations: list[dict] | list[list[dict]]) -> list[dict]:
+        # from .env_image_mc/lib/python3.11/site-packages/qwen_vl_utils/vision_process.py
+        # useful for clever sampling
+        vision_infos = []
+        if isinstance(conversations[0], dict):
+            conversations = [conversations]
+        for conversation in conversations:
+            for message in conversation:
+                if isinstance(message["content"], list):
+                    for ele in message["content"]:
+                        if (
+                            "image" in ele
+                            or "image_url" in ele
+                            or "video" in ele
+                            or ele.get("type","") in ("image", "image_url", "video")
+                        ):
+                            vision_infos.append(ele)
+        return vision_infos
+    
+    def process_vision_info_clever_sampling(
+            self,
+            conversations: list[dict] | list[list[dict]]
+        ) -> tuple[list[Image.Image] | None, list[torch.Tensor | list[Image.Image]] | None, Optional[dict]]:
+        # will be used for clever sampling
+        # according to .env_image_mc/lib/python3.11/site-packages/qwen_vl_utils/vision_process.py process_vision_info function
+        vision_infos = self.extract_vision_info(conversations)
+        sampling_technique = self.kwargs["clever_sampling"]
+        from giannis_stuff.giannis_utils import apply_clever_sampling
+        video_path = vision_infos[0]['video']
+
+        video_ar, _, _ = apply_clever_sampling(sampling_technique, video_path,
+                                         max_frames=self.kwargs["max_frames"],
+                                         sampling_extra_params=self.kwargs["sampling_extra_param"])
+        video_ar_trans = np.transpose(video_ar, (0, 3, 1, 2))
+        video_tensor = torch.from_numpy(video_ar_trans)
+
+        ###############################################################################################
+        """
+        Here I want to do the same thing as in process_vision_info function that does some clever resizing,
+        which some times is upsampling. What it actually contains is the code from the function fetch_video()
+        in .env_image_mc/lib/python3.11/site-packages/qwen_vl_utils/vision_process.py and the apropriate variables
+        """
+        from qwen_vl_utils import smart_resize
+        from torchvision import transforms
+        from torchvision.transforms import InterpolationMode
+        
+        IMAGE_FACTOR = 28
+        VIDEO_MIN_PIXELS = 128 * 28 * 28
+        VIDEO_MAX_PIXELS = 768 * 28 * 28
+        FRAME_FACTOR = 2
+        # Set the maximum number of video token inputs.
+        # Here, 128K represents the maximum number of input tokens for the VLLM model.
+        # Remember to adjust it according to your own configuration.
+        VIDEO_TOTAL_PIXELS = int(float(os.environ.get('VIDEO_MAX_PIXELS', 128000 * 28 * 28 * 0.9)))
+
+        video = torch.from_numpy(video_ar.transpose(0, 3, 1, 2))
+        ele = vision_infos[0] # only one video in this case
+        nframes, _, height, width = video.shape
+        min_pixels = ele.get("min_pixels", VIDEO_MIN_PIXELS)
+        total_pixels = ele.get("total_pixels", VIDEO_TOTAL_PIXELS)
+        max_pixels = max(min(VIDEO_MAX_PIXELS, total_pixels / nframes * FRAME_FACTOR), int(min_pixels * 1.05))
+
+        if "resized_height" in ele and "resized_width" in ele:
+            resized_height, resized_width = smart_resize(
+                ele["resized_height"],
+                ele["resized_width"],
+                factor=IMAGE_FACTOR,
+            )
+        else:
+            resized_height, resized_width = smart_resize(
+                height,
+                width,
+                factor=IMAGE_FACTOR,
+                min_pixels=min_pixels,
+                max_pixels=max_pixels,
+            )
+        video = transforms.functional.resize(
+            video,
+            [resized_height, resized_width],
+            interpolation=InterpolationMode.BICUBIC,
+            antialias=True,
+        ).float()
+
+        video_tensor = video.to(dtype=torch.uint8)
+        ###############################################################################################
+
+        return None, [video_tensor]
+    
     def generate_inner_transformers(self, message, dataset=None):
         if listinstr(['omni'], self.model_path.lower()):
             try:
@@ -482,7 +557,11 @@ class Qwen2VLChat(Qwen2VLPromptMixin, BaseModel):
             audios, images, videos = process_mm_info([messages], use_audio_in_video=self.use_audio_in_video)
             inputs = self.processor(text=text, images=images,audio=audios, videos=videos, padding=True, return_tensors='pt',use_audio_in_video=self.use_audio_in_video)  # noqa: E501
         else:
-            images, videos = process_vision_info([messages])
+            if not 'clever_sampling' in self.kwargs:
+                # videos -> torch.Size([64, 3, 756, 1344])
+                images, videos = process_vision_info([messages])
+            else:
+                images, videos = self.process_vision_info_clever_sampling([messages])
             inputs = self.processor(text=text, images=images, videos=videos, padding=True, return_tensors='pt')  # noqa: E501
         inputs = inputs.to('cuda')
 
@@ -568,7 +647,7 @@ class Qwen2VLChat(Qwen2VLPromptMixin, BaseModel):
             images, videos = process_vision_info(messages)
         print('finishing process vision info in vllm.')
 
-        if DATASET_MODALITY(dataset) == 'VIDEO' and 'megabench' not in dataset.lower():
+        if DATASET_MODALITY(dataset) == 'VIDEO':
             assert len(videos) == 1
             videos_nd = [videos[0].detach().cpu().numpy().transpose(0, 2, 3, 1)]
 

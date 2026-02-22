@@ -1,0 +1,54 @@
+{
+    "model": {
+        "llava_onevision_qwen2_0.5b_ov": {
+            "class": "LLaVA_OneVision",
+            "model_path": "lmms-lab/llava-onevision-qwen2-0.5b-ov"
+        }
+    },
+    "data": {
+        "LLaVABench": {
+            "class": "LLaVABench",
+            "dataset": "LLaVABench"
+        },
+        "LLaVABench_bdp_lan_rgb_00": {
+            "class": "LLaVABench",
+            "dataset": "LLaVABench_bdp_lan_rgb_00"
+        },
+        "LLaVABench_bdp_lan_rgb_01": {
+            "class": "LLaVABench",
+            "dataset": "LLaVABench_bdp_lan_rgb_01"
+        },
+        "LLaVABench_bdp_lan_rgb_02": {
+            "class": "LLaVABench",
+            "dataset": "LLaVABench_bdp_lan_rgb_02"
+        },
+        "LLaVABench_bdp_lan_rgb_03": {
+            "class": "LLaVABench",
+            "dataset": "LLaVABench_bdp_lan_rgb_03"
+        },
+        "LLaVABench_bdp_lan_rgb_04": {
+            "class": "LLaVABench",
+            "dataset": "LLaVABench_bdp_lan_rgb_04"
+        },
+        "LLaVABench_bdp_lan_rgb_05": {
+            "class": "LLaVABench",
+            "dataset": "LLaVABench_bdp_lan_rgb_05"
+        },
+        "LLaVABench_bdp_lan_rgb_06": {
+            "class": "LLaVABench",
+            "dataset": "LLaVABench_bdp_lan_rgb_06"
+        },
+        "LLaVABench_bdp_lan_rgb_07": {
+            "class": "LLaVABench",
+            "dataset": "LLaVABench_bdp_lan_rgb_07"
+        },
+        "LLaVABench_bdp_lan_rgb_08": {
+            "class": "LLaVABench",
+            "dataset": "LLaVABench_bdp_lan_rgb_08"
+        },
+        "LLaVABench_bdp_lan_rgb_09": {
+            "class": "LLaVABench",
+            "dataset": "LLaVABench_bdp_lan_rgb_09"
+        }
+    }
+}

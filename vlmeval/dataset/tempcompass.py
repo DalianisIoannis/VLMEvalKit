@@ -25,8 +25,9 @@ class TempCompass(ConcatVideoDataset):
 
     def evaluate(self, eval_file, **judge_kwargs):
         result = super().evaluate(eval_file=eval_file, **judge_kwargs)
+        suffix = eval_file.split('.')[-1]
         result = result.reset_index().rename(columns={'index': 'dim.task_type'})
-        score_file = get_intermediate_file_path(eval_file, '_acc', 'csv')
+        score_file = eval_file.replace(f'.{suffix}', '_acc.csv')
         avg_dict = {}
         for idx, item in result.iterrows():
             dim, task_type = item['dim.task_type'].split('. ')
@@ -59,7 +60,6 @@ class TempCompass_MCQ(VideoBaseDataset):
 
     MD5 = '7efbb9e6d9dabacd22daf274852691dd'
     TYPE = 'Video-MCQ'
-    DEFAULT_JUDGE = ['chatgpt-1106']
 
     def __init__(self, dataset='TempCompass_MCQ', nframe=0, fps=-1):
         self.type_data_list = {
@@ -170,14 +170,11 @@ class TempCompass_MCQ(VideoBaseDataset):
         flag = np.all([osp.exists(p) for p in frame_paths])
 
         if not flag:
-            lock_path = osp.splitext(vid_path)[0] + '.lock'
-            with portalocker.Lock(lock_path, 'w', timeout=30):
-                if not np.all([osp.exists(p) for p in frame_paths]):
-                    images = [vid[i].asnumpy() for i in indices]
-                    images = [Image.fromarray(arr) for arr in images]
-                    for im, pth in zip(images, frame_paths):
-                        if not osp.exists(pth):
-                            im.save(pth)
+            images = [vid[i].asnumpy() for i in indices]
+            images = [Image.fromarray(arr) for arr in images]
+            for im, pth in zip(images, frame_paths):
+                if not osp.exists(pth):
+                    im.save(pth)
 
         return frame_paths
 
@@ -206,6 +203,7 @@ class TempCompass_MCQ(VideoBaseDataset):
     @classmethod
     def evaluate(self, eval_file, **judge_kwargs):
         model = judge_kwargs.get('model', 'exact_matching')
+        assert model in ['chatgpt-1106', 'exact_matching']
         judge_kwargs.update({
             "max_tokens": 128,
             "temperature": 1.0,
@@ -213,8 +211,9 @@ class TempCompass_MCQ(VideoBaseDataset):
             "presence_penalty": 1,
         })
 
-        score_file = get_intermediate_file_path(eval_file, f'_{model}_score')
-        tmp_file = get_intermediate_file_path(eval_file, f'_{model}', 'pkl')
+        suffix = eval_file.split('.')[-1]
+        score_file = eval_file.replace(f'.{suffix}', f'_{model}_score.xlsx')
+        tmp_file = eval_file.replace(f'.{suffix}', f'_{model}.pkl')
         nproc = judge_kwargs.pop('nproc', 4)
 
         if not osp.exists(score_file):
@@ -257,7 +256,6 @@ class TempCompass_Captioning(VideoBaseDataset):
 
     MD5 = '35be9bf2581ea7767f02e9a8f37ae1ab'
     TYPE = 'Video-VQA'
-    DEFAULT_JUDGE = ['chatgpt-1106']
 
     def __init__(self, dataset='TempCompass_Captioning', nframe=0, fps=-1):
         self.type_data_list = {
@@ -286,7 +284,8 @@ class TempCompass_Captioning(VideoBaseDataset):
             return True
 
         cache_path = get_cache_path(repo_id)
-        if cache_path is not None and check_integrity(cache_path):
+        # if cache_path is not None and check_integrity(cache_path):
+        if cache_path is not None:
             dataset_path = cache_path
         else:
             def read_parquet(pth):
@@ -368,14 +367,11 @@ class TempCompass_Captioning(VideoBaseDataset):
         flag = np.all([osp.exists(p) for p in frame_paths])
 
         if not flag:
-            lock_path = osp.splitext(vid_path)[0] + '.lock'
-            with portalocker.Lock(lock_path, 'w', timeout=30):
-                if not np.all([osp.exists(p) for p in frame_paths]):
-                    images = [vid[i].asnumpy() for i in indices]
-                    images = [Image.fromarray(arr) for arr in images]
-                    for im, pth in zip(images, frame_paths):
-                        if not osp.exists(pth):
-                            im.save(pth)
+            images = [vid[i].asnumpy() for i in indices]
+            images = [Image.fromarray(arr) for arr in images]
+            for im, pth in zip(images, frame_paths):
+                if not osp.exists(pth):
+                    im.save(pth)
 
         return frame_paths
 
@@ -403,6 +399,7 @@ class TempCompass_Captioning(VideoBaseDataset):
     @classmethod
     def evaluate(self, eval_file, **judge_kwargs):
         model = judge_kwargs.setdefault('model', 'chatgpt-1106')
+        assert model in ['chatgpt-1106']
         judge_kwargs.update({
             "max_tokens": 128,
             "temperature": 1.0,
@@ -410,8 +407,9 @@ class TempCompass_Captioning(VideoBaseDataset):
             "presence_penalty": 1,
         })
 
-        score_file = get_intermediate_file_path(eval_file, f'_{model}_score')
-        tmp_file = get_intermediate_file_path(eval_file, f'_{model}', 'pkl')
+        suffix = eval_file.split('.')[-1]
+        score_file = eval_file.replace(f'.{suffix}', f'_{model}_score.xlsx')
+        tmp_file = eval_file.replace(f'.{suffix}', f'_{model}.pkl')
         nproc = judge_kwargs.pop('nproc', 4)
 
         if not osp.exists(score_file):
@@ -454,7 +452,6 @@ class TempCompass_YorN(VideoBaseDataset):
 
     MD5 = 'c72c046d7fa0e82c8cd7462f2e844ea8'
     TYPE = 'Video-Y/N'
-    DEFAULT_JUDGE = ['chatgpt-1106']
 
     def __init__(self, dataset='TempCompass_YorN', nframe=0, fps=-1):
         self.type_data_list = {
@@ -563,14 +560,11 @@ class TempCompass_YorN(VideoBaseDataset):
         flag = np.all([osp.exists(p) for p in frame_paths])
 
         if not flag:
-            lock_path = osp.splitext(vid_path)[0] + '.lock'
-            with portalocker.Lock(lock_path, 'w', timeout=30):
-                if not np.all([osp.exists(p) for p in frame_paths]):
-                    images = [vid[i].asnumpy() for i in indices]
-                    images = [Image.fromarray(arr) for arr in images]
-                    for im, pth in zip(images, frame_paths):
-                        if not osp.exists(pth):
-                            im.save(pth)
+            images = [vid[i].asnumpy() for i in indices]
+            images = [Image.fromarray(arr) for arr in images]
+            for im, pth in zip(images, frame_paths):
+                if not osp.exists(pth):
+                    im.save(pth)
 
         return frame_paths
 
@@ -599,6 +593,7 @@ class TempCompass_YorN(VideoBaseDataset):
     @classmethod
     def evaluate(self, eval_file, **judge_kwargs):
         model = judge_kwargs.get('model', 'exact_matching')
+        assert model in ['chatgpt-1106', 'exact_matching']
         judge_kwargs.update({
             "max_tokens": 128,
             "temperature": 1.0,
@@ -606,8 +601,9 @@ class TempCompass_YorN(VideoBaseDataset):
             "presence_penalty": 1,
         })
 
-        score_file = get_intermediate_file_path(eval_file, f'_{model}_score')
-        tmp_file = get_intermediate_file_path(eval_file, f'_{model}', 'pkl')
+        suffix = eval_file.split('.')[-1]
+        score_file = eval_file.replace(f'.{suffix}', f'_{model}_score.xlsx')
+        tmp_file = eval_file.replace(f'.{suffix}', f'_{model}.pkl')
         nproc = judge_kwargs.pop('nproc', 4)
 
         if not osp.exists(score_file):

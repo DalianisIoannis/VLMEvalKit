@@ -175,43 +175,6 @@ def report_acc_MMSci(df):
     return full_acc_df
 
 
-def report_topviewrs_acc(df):
-    # assert group in [None, 'category', 'l2-category']
-    res = defaultdict(list)
-    print(df.columns)
-
-    if 'split' in df:
-        splits = list(set(df['split']))
-        res['split'] = splits
-    else:
-        df['split'] = ['none'] * len(df)
-        res['split'] = ['none']
-
-    for group in [None, 'l2-category', 'category']:
-        if group is None:
-
-            res['Overall'] = [np.mean(df[df['split'] == sp]['hit']) for sp in res['split']]
-
-            if 'partial_match' in df:
-                res['Overall_PM'] = [np.mean(df[df['split'] == sp]['partial_match']) for sp in res['split']]
-        elif group not in df:
-            continue
-        else:
-            abilities = list(set(df[group]))
-            abilities.sort()
-            for ab in abilities:
-                ab_name = MMB_abbrs[ab] if ab in MMB_abbrs else ab
-                sub_df = df[df[group] == ab]
-                res[ab_name] = [np.mean(sub_df[sub_df['split'] == sp]['hit']) for sp in res['split']]
-                if 'partial_match' in df:
-                    res[f'{ab_name}_PM'] = [
-                        np.mean(sub_df[sub_df['split'] == sp]['partial_match'])
-                        for sp in res['split']
-                    ]
-
-    return pd.DataFrame(res)
-
-
 def build_prompt(question, options, prediction):
     tmpl = (
         'You are an AI assistant who will help me to match '
@@ -359,13 +322,13 @@ def extract_answer_from_item(model, item, dataset_name=None):
         prompt = build_prompt_wemath(item['question'], option_str, item['prediction'])
     elif cn_string(item['question']):
         prompt = build_prompt_cn(item['question'], option_str, item['prediction'])
-    elif dataset_name is not None and 'LEGO' in dataset_name:
+    elif 'LEGO' in dataset_name:
         prompt = build_prompt_LEGO(item['question'], option_str, item['prediction'],item['question_type'])
     else:
         prompt = build_prompt(item['question'], option_str, item['prediction'])
     retry = 3
 
-    if dataset_name is not None and 'LEGO' in dataset_name:
+    if 'LEGO' in dataset_name:
         ret = can_infer_lego(item['prediction'], item['question_type'], choices)
     else:
         ret = can_infer(item['prediction'], choices)
@@ -379,7 +342,7 @@ def extract_answer_from_item(model, item, dataset_name=None):
         if 'Failed to obtain answer via API' in ans:
             logger.warning('GPT API failed to answer. ')
         else:
-            if dataset_name is not None and 'LEGO' in dataset_name:
+            if 'LEGO' in dataset_name:
                 ret = can_infer_lego(ans, item['question_type'], choices)
             else:
                 ret = can_infer(ans, choices)
@@ -562,8 +525,7 @@ def mcq_circular_eval(model, data, meta, nproc, result_file, dataset_name=None):
                 if k not in result:
                     result[k] = v
 
-    tmp_ext = get_pred_file_format()
-    tmp_pth = f'/tmp/{timestr()}.{tmp_ext}'
+    tmp_pth = f'/tmp/{timestr()}.xlsx'
     dump(data_main, tmp_pth)
     data_main = load(tmp_pth)
     indices = data_main['index']
@@ -601,18 +563,6 @@ def extract_characters_regex(s, choices=['(A)', '(B)', '(C)', '(D)', '(E)']):
                 return choice[1]
         return ''
     return matches[0]
-
-
-def report_acc_MMVP(df):
-    assert len(df) % 2 == 0
-    for i in range(len(df) // 2):
-        assert df['question'][2 * i] == df['question'][2 * i + 1]
-    res = {}
-    res['Average'] = np.mean(df['hit'])
-    hits = list(df['hit'])
-    both_correct = [hits[2 * i] and hits[2 * i + 1] for i in range(len(df) // 2)]
-    res['Overall'] = np.mean(both_correct)
-    return d2df(res)
 
 
 def get_dimension_rating(data_path):

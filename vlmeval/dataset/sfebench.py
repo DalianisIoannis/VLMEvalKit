@@ -1,7 +1,5 @@
 import string
 from vlmeval import *
-from ..smp import *
-from ..smp.file import get_intermediate_file_path
 from .image_vqa import ImageVQADataset
 from .utils.judge_util import build_judge
 from ..utils import track_progress_rich
@@ -51,7 +49,7 @@ def report_score(df):
 
     for group in [None, 'category']:
         if group is None:
-            res['Overall'] = [np.mean(df[df['split'] == sp]['score']) / 9 * 100 for sp in res['split']]
+            res['Overall'] = [np.mean(df[df['split'] == sp]['score']) for sp in res['split']]
         elif group not in df:
             continue
         else:
@@ -59,7 +57,7 @@ def report_score(df):
             abilities.sort()
             for ab in abilities:
                 sub_df = df[df[group] == ab]
-                res[ab] = [np.mean(sub_df[sub_df['split'] == sp]['score']) / 9 * 100 for sp in res['split']]
+                res[ab] = [np.mean(sub_df[sub_df['split'] == sp]['score']) for sp in res['split']]
     return pd.DataFrame(res)
 
 
@@ -174,20 +172,23 @@ class SFE(ImageVQADataset):
         assert 'answer' in data and 'prediction' in data
         data['prediction'] = [str(x) for x in data['prediction']]
         data['answer'] = [str(x) for x in data['answer']]
-        storage = get_intermediate_file_path(eval_file, '_judge')
-        tmp_file = get_intermediate_file_path(eval_file, '_tmp', 'pkl')
+        storage = eval_file.replace('.xlsx', '_judge.xlsx')
+        tmp_file = eval_file.replace('.xlsx', '_tmp.pkl')
         nproc = judge_kwargs.pop('nproc', 4)
         if not osp.exists(storage):
             ans_map = {} if not osp.exists(tmp_file) else load(tmp_file)
 
-            model = judge_kwargs.pop('model', 'gpt-4o-1120')
+            model = judge_kwargs.get('model', 'gpt-4o-1120')
             if model == 'exact_matching':
                 model = None
-            else:
+            elif gpt_key_set():
                 model = build_judge(model=model, **judge_kwargs)
                 if not model.working():
                     warnings.warn('OPENAI API is not working properly, will use exact matching for evaluation')
                     model = None
+            else:
+                model = None
+                warnings.warn('OPENAI_API_KEY is not working properly, will use exact matching for evaluation')
 
             if model is not None:
                 if 'g_index' not in data:
@@ -215,6 +216,6 @@ class SFE(ImageVQADataset):
         data = load(storage)
         score = report_score(data)
 
-        score_file = get_intermediate_file_path(eval_file, '_score', 'csv')
+        score_file = eval_file.replace('.xlsx', '_score.csv')
         dump(score, score_file)
         return score

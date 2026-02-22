@@ -36,9 +36,7 @@ def infer_data_api(model, work_dir, model_name, dataset, index_set=None, api_npr
     structs = []
     for i in range(lt):
         item = data.iloc[i]
-        if hasattr(dataset, 'force_use_dataset_prompt') and dataset.force_use_dataset_prompt:
-            struct = dataset.build_prompt(item)
-        elif hasattr(model, 'use_custom_prompt') and model.use_custom_prompt(dataset_name):
+        if hasattr(model, 'use_custom_prompt') and model.use_custom_prompt(dataset_name):
             assert hasattr(model, 'build_prompt')
             struct = model.build_prompt(item, dataset=dataset_name)
         else:
@@ -49,11 +47,10 @@ def infer_data_api(model, work_dir, model_name, dataset, index_set=None, api_npr
 
     # To reuse records in MMBench_V11
     if dataset_name in ['MMBench', 'MMBench_CN']:
-        pred_format = get_pred_file_format()
-        v11_pred = f'{work_dir}/{model_name}_{dataset_name}_V11.{pred_format}'
+        v11_pred = f'{work_dir}/{model_name}_{dataset_name}_V11.xlsx'
         if osp.exists(v11_pred):
             try:
-                reuse_inds = load('https://opencompass.openxlab.space/utils/mmb_reuse.pkl')
+                reuse_inds = load('http://opencompass.openxlab.space/utils/mmb_reuse.pkl')
                 data = load(v11_pred)
                 ans_map = {x: y for x, y in zip(data['index'], data['prediction']) if x in reuse_inds}
                 dump(ans_map, out_file)
@@ -117,6 +114,12 @@ def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, ap
         or 'Qwen2.5-VL' in model_name
     ):
         kwargs = {'use_vllm': use_vllm}
+    # ############################################################################
+    # # changes for Pixtral MCQ
+    # # not yet using it because I commented this part in pixtral, but has to change in the future
+    # ############################################################################
+    # if model_name is not None and 'Pixtral-12B' in model_name:
+    #     kwargs = {'MCQ': True}
 
     # (25.06.05) In newer version of transformers (after 4.50), with device_map='auto' and torchrun launcher,
     # Transformers automatically adopt TP parallelism, which leads to compatibility problems with VLMEvalKit
@@ -151,9 +154,7 @@ def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, ap
         if idx in res:
             continue
 
-        if hasattr(dataset, 'force_use_dataset_prompt') and dataset.force_use_dataset_prompt:
-            struct = dataset.build_prompt(data.iloc[i])
-        elif hasattr(model, 'use_custom_prompt') and model.use_custom_prompt(dataset_name):
+        if hasattr(model, 'use_custom_prompt') and model.use_custom_prompt(dataset_name):
             struct = model.build_prompt(data.iloc[i], dataset=dataset_name)
         else:
             struct = dataset.build_prompt(data.iloc[i])
@@ -183,25 +184,18 @@ def infer_data(model, model_name, work_dir, dataset, out_file, verbose=False, ap
     return model
 
 
-# Add for agent evaluation
-def _is_structured_record(v):
-    return isinstance(v, dict) and 'prediction' in v and 'extra_records' in v
-
-
 # A wrapper for infer_data, do the pre & post processing
 def infer_data_job(
     model, work_dir, model_name, dataset, verbose=False, api_nproc=4, ignore_failed=False, use_vllm=False
 ):
     rank, world_size = get_rank_and_world_size()
     dataset_name = dataset.dataset_name
-    # 使用环境变量控制的文件格式
-    result_file = get_pred_file_path(work_dir, model_name, dataset_name, use_env_format=True)
+    result_file = osp.join(work_dir, f'{model_name}_{dataset_name}.xlsx')
 
     prev_file = f'{work_dir}/{model_name}_{dataset_name}_PREV.pkl'
     if osp.exists(result_file):
         if rank == 0:
             data = load(result_file)
-            # breakpoint()
             results = {k: v for k, v in zip(data['index'], data['prediction'])}
             if not ignore_failed:
                 results = {k: v for k, v in results.items() if FAIL_MSG not in str(v)}
@@ -226,41 +220,7 @@ def infer_data_job(
         data = dataset.data
         for x in data['index']:
             assert x in data_all
-        if os.getenv('SPLIT_THINK', False):
-            if all(_is_structured_record(data_all[x]) for x in data['index']):
-                prediction = [data_all[x]['prediction'] for x in data['index']]
-                extra_records = [data_all[x]['extra_records'] for x in data['index']]
-                data['extra_records'] = extra_records
-            else:
-                prediction = [str(data_all[x]) for x in data['index']]
-
-            def split_thinking(s):
-                if '</think>' in s:
-                    splits = s.split('</think>')
-                    prediction = splits[-1].strip()
-                    if len(splits) == 2 and '<think>' in splits[0]:
-                        thinking = splits[0].split('<think>')[1].strip()
-                    else:
-                        thinking = '</think>'.join(splits[:-1])
-                        thinking += '</think>'
-                        warnings.warn('Failed to parse thinking, multiple </think> tags or missing <think> tag.')
-                else:
-                    thinking = ''
-                    prediction = s
-                return (prediction, thinking)
-            split_func = model.split_thinking if hasattr(model, 'split_thinking') else split_thinking
-            print(f'Prediction format: {os.getenv("SPLIT_THINK")},splitting func: {split_func}')
-            tups = [split_func(x) for x in prediction]
-            data['prediction'] = [x[0] for x in tups]
-            data['thinking'] = [x[1] for x in tups]
-        else:
-            # data['prediction'] = [str(data_all[x]) for x in data['index']]
-            # Add for agent evaluation
-            if all(_is_structured_record(data_all[x]) for x in data['index']):
-                data['prediction'] = [data_all[x]['prediction'] for x in data['index']]
-                data['extra_records'] = [data_all[x]['extra_records'] for x in data['index']]
-            else:
-                data['prediction'] = [str(data_all[x]) for x in data['index']]
+        data['prediction'] = [str(data_all[x]) for x in data['index']]
         if 'image' in data:
             data.pop('image')
 

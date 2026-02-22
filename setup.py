@@ -45,7 +45,7 @@ def parse_requirements(fname='requirements.txt', with_version=True):
                     op, rest = parts[1:]
                     if ';' in rest:
                         # Handle platform specific dependencies
-                        # https://setuptools.readthedocs.io/en/latest/setuptools.html#declaring-platform-specific-dependencies
+                        # http://setuptools.readthedocs.io/en/latest/setuptools.html#declaring-platform-specific-dependencies
                         version, platform_deps = map(str.strip,
                                                      rest.split(';'))
                         info['platform_deps'] = platform_deps
@@ -80,7 +80,7 @@ def parse_requirements(fname='requirements.txt', with_version=True):
     return packages
 
 
-with open('README.md', encoding="utf-8") as f:
+with open('README.md') as f:
     readme = f.read()
 
 

@@ -6,16 +6,14 @@ from .image_yorn import ImageYORNDataset
 from .image_mcq import (
     ImageMCQDataset, MMMUDataset, CustomMCQDataset, MUIRDataset, GMAIMMBenchDataset, MMERealWorld, HRBenchDataset,
     NaturalBenchDataset, WeMath, MMMUProDataset, VMCBenchDataset, MedXpertQA_MM_test, LEGO, VisuLogic, CVBench, TDBench,
-    MicroBench, OmniMedVQA, MSEarthMCQ, VLMBlind, SCAM, _3DSRBench, AffordanceDataset, OmniEarthMCQBench, XLRSBench,
-    TreeBench, CVQA, TopViewRS
+    MicroBench, OmniMedVQA, MSEarthMCQ, VLMBlind, SCAM, _3DSRBench, AffordanceDataset
 )
 from .image_mt import MMDUDataset
 from .image_vqa import (
-    ImageVQADataset, MathVision, LENS, OCRBench, MathVista, LLaVABench, LLaVABench_KO, VGRPBench, MMVet, MTVQADataset,
-    TableVQABench, CustomVQADataset, CRPE, MathVerse, OlympiadBench, SeePhys, QSpatial, VizWiz, MMNIAH, LogicVista,
-    MME_CoT, MMSci_Captioning, Physics_yale, TDBenchGrounding, WildDocBenchmark, OCR_Reasoning, PhyX, CountBenchQA,
-    ZEROBench, Omni3DBench, TallyQA, MMEReasoning, MMVMBench, BMMR, OCRBench_v2, AyaVisionBench, MathCanvas, MMReason,
-    CoreCognition, VLMsAreBiased, VTCBench
+    ImageVQADataset, MathVision, OCRBench, MathVista, LLaVABench, VGRPBench, MMVet, MTVQADataset, TableVQABench,
+    CustomVQADataset, CRPE, MathVerse, OlympiadBench, QSpatial, VizWiz, MMNIAH, LogicVista, MME_CoT,
+    MMSci_Captioning, Physics_yale, TDBenchGrounding, WildDocBenchmark, OCR_Reasoning, PhyX, CountBenchQA,
+    ZEROBench, Omni3DBench, TallyQA, MMEReasoning, MMVMBench
 )
 
 from .image_ccocr import CCOCRDataset
@@ -28,14 +26,12 @@ from .dude import DUDE
 from .slidevqa import SlideVQA
 from .vl_rewardbench import VLRewardBench
 from .vlm2bench import VLM2Bench
-from .vlmbias import VLMBias
 from .spatial457 import Spatial457
 from .charxiv import CharXiv
-from .chartmuseum import ChartMuseum
-from .chartqapro import ChartQAPro
-from .refcoco import RefCOCODataset
-from .simplevqa import SimpleVQA
 
+#########################################################
+from .llava_video_dataset import LLavaVideoMCQDataset
+#########################################################
 from .mmbench_video import MMBenchVideo
 from .videomme import VideoMME
 from .video_holmes import Video_Holmes
@@ -48,26 +44,13 @@ from .longvideobench import LongVideoBench
 from .video_concat_dataset import ConcatVideoDataset
 from .mmgenbench import MMGenBench
 from .cgbench import CGBench_MCQ_Grounding_Mini, CGBench_OpenEnded_Mini, CGBench_MCQ_Grounding, CGBench_OpenEnded
-from .CGAVCounting.cg_av_counting import CGAVCounting
-from .dream import DREAM
 from .megabench import MEGABench
 from .moviechat1k import MovieChat1k
-from .video_mmlu import Video_MMLU_CAP, Video_MMLU_QA
+from .video_mmlu import VideoMMLU_CAP, VideoMMLU_QA
 from .vdc import VDC
-from .vcrbench import VCRBench
 from .gobench import GOBenchDataset
 from .sfebench import SFE
-from .visfactor import VisFactor
-from .ost_bench import OSTDataset
-from .videommmu import VideoMMMU
-from .vsibench import VSIBench
-from .mvu_eval import MVUEval
-from .omtgbench import OMTGBench
 
-from .mmsi_video import MMSIVideoBench
-from .groundingme import GroundingME
-from .EgoExoBench.egoexobench import EgoExoBench_MCQ
-from .videott import VideoTT
 
 from .worldsense import WorldSense
 from .qbench_video import QBench_Video, QBench_Video_MCQ, QBench_Video_VQA
@@ -82,32 +65,12 @@ from .mmalignbench import MMAlignBench
 from .utils import *
 from .video_dataset_config import *
 from ..smp import *
-from .OmniDocBench.omnidocbench import OmniDocBench
-from .foxbench import FoxBench
+from .Omnidocbench.omnidocbench import OmniDocBench
 from .moat import MOAT
 from .GUI.screenspot import ScreenSpot
-from .GUI.screenspot_v2 import ScreenSpotV2
 from .GUI.screenspot_pro import ScreenSpot_Pro
 from .mmifeval import MMIFEval
 from .chartmimic import ChartMimic
-from .m4bench import M4Bench
-from .vlrmbench import VLRMBench
-from .mmhelix import MMHELIX
-from .medqbench_mcq import MedqbenchMCQDataset
-from .medqbench_caption import MedqbenchCaptionDataset
-from .medqbench_paired_description import MedqbenchPairedDescriptionDataset
-from .olmOCRBench.olmocrbench import olmOCRBench
-from .oceanocr import OceanOCRBench
-from .matbench import MATBench
-
-from .reasonmap_plus import ReasonMap_Plus
-from .hipho import HiPhODataset
-from .gsm8k_v import GSM8KVDataset
-from .macbench import MaCBench
-from .mmesci import MMESCIDataset
-from .sarena_mini import SArena_MINI
-from .uni_svg import UniSVG
-from .asclepius import Asclepius
 
 
 class ConcatDataset(ImageBaseDataset):
@@ -126,7 +89,6 @@ class ConcatDataset(ImageBaseDataset):
         ],
         'ScreenSpot': ['ScreenSpot_Mobile', 'ScreenSpot_Desktop', 'ScreenSpot_Web'],
         'ScreenSpot_v2': ['ScreenSpot_v2_Mobile', 'ScreenSpot_v2_Desktop', 'ScreenSpot_v2_Web'],
-        'M4Bench': ['State_Invariance', 'State_Comparison', 'Spatial_Perception', 'Instance_Comparison', 'Detailed_Difference'],  # noqa: E501
     }
 
     def __init__(self, dataset):
@@ -181,6 +143,7 @@ class ConcatDataset(ImageBaseDataset):
         return list(cls.DATASET_SETS)
 
     def evaluate(self, eval_file, **judge_kwargs):
+        suffix = eval_file.split('.')[-1]
         # First, split the eval_file by dataset
         data_all = load(eval_file)
         for dname in self.datasets:
@@ -208,11 +171,11 @@ class ConcatDataset(ImageBaseDataset):
 
         if len(df_all):
             result = pd.concat(df_all)
-            score_file = get_intermediate_file_path(eval_file, '_acc', 'csv')
+            score_file = eval_file.replace(f'.{suffix}', '_acc.csv')
             dump(result, score_file)
             return result
         else:
-            score_file = get_intermediate_file_path(eval_file, '_score', 'json')
+            score_file = eval_file.replace(f'.{suffix}', '_score.json')
             dump(dict_all, score_file)
             return dict_all
 
@@ -220,27 +183,22 @@ class ConcatDataset(ImageBaseDataset):
 # Add new supported dataset class here
 IMAGE_DATASET = [
     ImageCaptionDataset, ImageYORNDataset, ImageMCQDataset, ImageVQADataset,
-    MathVision, LENS, MMMUDataset, OCRBench, MathVista, LLaVABench, LLaVABench_KO, VGRPBench, MMVet,
+    MathVision, MMMUDataset, OCRBench, MathVista, LLaVABench, VGRPBench, MMVet,
     MTVQADataset, TableVQABench, MMLongBench, VCRDataset, MMDUDataset, DUDE,
     SlideVQA, MUIRDataset, CCOCRDataset, GMAIMMBenchDataset, MMERealWorld,
     HRBenchDataset, CRPE, MathVerse, NaturalBenchDataset, MIABench,
-    OlympiadBench, SeePhys, WildVision, MMMath, QSpatial, Dynamath, GSM8KVDataset, MMGenBench, VizWiz,
+    OlympiadBench, WildVision, MMMath, QSpatial, Dynamath, MMGenBench, VizWiz,
     MMNIAH, CMMMU, VLRewardBench, WeMath, LogicVista, MMMUProDataset,
     CreationMMBenchDataset, ImageShortQADataset, MMAlignBench, OmniDocBench,
     VLM2Bench, VMCBenchDataset, EMMADataset, MME_CoT, MOAT, MedXpertQA_MM_test,
     LEGO, MMSci_Captioning, Physics_yale, ScreenSpot_Pro, ScreenSpot,
-    ScreenSpotV2, MMIFEval, Spatial457, VisuLogic, CVBench, PathVQA_VAL,
+    MMIFEval, Spatial457, VisuLogic, CVBench, PathVQA_VAL,
     PathVQA_TEST, TDBench, TDBenchGrounding, MicroBench, CharXiv, OmniMedVQA,
     WildDocBenchmark, MSEarthMCQ, OCR_Reasoning, PhyX, VLMBlind, CountBenchQA,
-    ZEROBench, SCAM, Omni3DBench, TallyQA, _3DSRBench, BMMR, AffordanceDataset,
-    MMEReasoning, GOBenchDataset, SFE, ChartMimic, MMVMBench, XLRSBench,
-    OmniEarthMCQBench, VisFactor, OSTDataset, OCRBench_v2, TreeBench, CVQA, M4Bench,
-    AyaVisionBench, TopViewRS, VLMBias, MMHELIX, MedqbenchMCQDataset, MathCanvas, MMReason,
-    MedqbenchPairedDescriptionDataset, MedqbenchCaptionDataset, ChartMuseum, ChartQAPro, ReasonMap_Plus,
-    olmOCRBench, OceanOCRBench, MATBench, VLRMBench, RefCOCODataset, SimpleVQA, HiPhODataset, MaCBench,
-    UniSVG, SArena_MINI, VLMsAreBiased, MMESCIDataset, CoreCognition, GroundingME,
-    FoxBench, VTCBench, Asclepius
+    ZEROBench, SCAM, Omni3DBench, TallyQA, _3DSRBench, AffordanceDataset,
+    MMEReasoning, GOBenchDataset, SFE, ChartMimic, MMVMBench,
 ]
+
 
 VIDEO_DATASET = [
     MMBenchVideo, VideoMME, MVBench, MVBench_MP4, MVTamperBench,
@@ -249,10 +207,9 @@ VIDEO_DATASET = [
     TempCompass, TempCompass_MCQ, TempCompass_Captioning, TempCompass_YorN,
     CGBench_MCQ_Grounding_Mini, CGBench_OpenEnded_Mini, CGBench_MCQ_Grounding, CGBench_OpenEnded,
     QBench_Video, QBench_Video_MCQ, QBench_Video_VQA,
-    Video_MMLU_CAP, Video_MMLU_QA,
-    Video_Holmes, VCRBench, CGAVCounting, MMSIVideoBench,
-    EgoExoBench_MCQ, DREAM, VideoMMMU, VSIBench, MVUEval, OMTGBench
-
+    VideoMMLU_CAP, VideoMMLU_QA,
+    Video_Holmes
+    , LLavaVideoMCQDataset
 ]
 
 TEXT_DATASET = [
@@ -330,16 +287,18 @@ def build_dataset(dataset_name, **kwargs):
         warnings.warn(f'Data file {data_file} does not have a `question` column. Dataset building failed. ')
         return None
 
-    if 'A' in data and 'B' in data:
-        if 'image' in data or 'image_path' in data:
-            warnings.warn(f'Will assume unsupported dataset {dataset_name} as a Custom MCQ dataset. ')
-            return CustomMCQDataset(dataset=dataset_name, **kwargs)
-        else:
-            warnings.warn(f'Will assume unsupported dataset {dataset_name} as a Custom Text MCQ dataset. ')
-            return CustomTextMCQDataset(dataset=dataset_name, **kwargs)
+    #########################################################
+    # if 'A' in data and 'B' in data:
+    if 'image' in data or 'image_path' in data:
+        warnings.warn(f'Will assume unsupported dataset {dataset_name} as a Custom MCQ dataset. ')
+        return CustomMCQDataset(dataset=dataset_name, **kwargs)
     else:
-        warnings.warn(f'Will assume unsupported dataset {dataset_name} as a Custom VQA dataset. ')
-        return CustomVQADataset(dataset=dataset_name, **kwargs)
+        warnings.warn(f'Will assume unsupported dataset {dataset_name} as a Custom Text MCQ dataset. ')
+        return CustomTextMCQDataset(dataset=dataset_name, **kwargs)
+    # else:
+    #     warnings.warn(f'Will assume unsupported dataset {dataset_name} as a Custom VQA dataset. ')
+    #     return CustomVQADataset(dataset=dataset_name, **kwargs)
+    #########################################################
 
 
 def infer_dataset_basename(dataset_name):

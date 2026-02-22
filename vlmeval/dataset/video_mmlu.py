@@ -1,7 +1,6 @@
 # flake8: noqa
 from huggingface_hub import snapshot_download
 from ..smp import *
-from ..smp.file import get_intermediate_file_path, get_file_extension
 from .video_base import VideoBaseDataset
 from .utils import build_judge, DEBUG_MESSAGE
 from ..utils import track_progress_rich
@@ -42,7 +41,7 @@ detailed_caption_prompts = [
 ]
 
 
-class Video_MMLU_CAP(VideoBaseDataset):
+class VideoMMLU_CAP(VideoBaseDataset):
 
     MD5 = ''
 
@@ -74,7 +73,7 @@ class Video_MMLU_CAP(VideoBaseDataset):
 
     @classmethod
     def supported_datasets(cls):
-        return ['Video_MMLU_CAP']
+        return ['VideoMMLU_CAP']
 
     def prepare_dataset(self, dataset_name='Video_MMLU_CAP', repo_id='Enxin/Video-MMLU'):
         def check_integrity(pth):
@@ -235,8 +234,8 @@ class Video_MMLU_CAP(VideoBaseDataset):
                 for l in lines:
                     l = l.strip()
                     if ': ' in l:
-                        key = Video_MMLU_CAP.remove_side_quote(l.split(': ')[0].strip())
-                        val = Video_MMLU_CAP.remove_side_quote(l.split(': ')[1].strip())
+                        key = VideoMMLU_CAP.remove_side_quote(l.split(': ')[0].strip())
+                        val = VideoMMLU_CAP.remove_side_quote(l.split(': ')[1].strip())
                         if len(key) and len(val):
                             res[key] = val
                 return res
@@ -277,16 +276,16 @@ class Video_MMLU_CAP(VideoBaseDataset):
     def evaluate(self, eval_file, **judge_kwargs):
         from .utils.video_mmlu import get_dimension_rating, prepare_response_prompt, prepare_score_prompt, SYSTEM_CAL_SCORE_PROMPT_CAP, SYSTEM_GENER_PRED_PROMPT
 
-        assert get_file_extension(eval_file) in ['xlsx', 'json', 'tsv'], 'data file should be an supported format (xlsx/json/tsv) file'
+        assert eval_file.endswith('.xlsx'), 'data file should be an xlsx file'
         judge = judge_kwargs['model']
         nproc = judge_kwargs.pop('nproc', 4)
         _ = judge_kwargs.pop('verbose', None)
         _ = judge_kwargs.pop('retry', None)
 
-        response_file = get_intermediate_file_path(eval_file, f'_{judge}_response', 'pkl')
-        tmp_file = get_intermediate_file_path(eval_file, f'_{judge}_tmp', 'pkl')
-        tgt_file = get_intermediate_file_path(eval_file, f'_{judge}_rating', 'json')
-        score_file = get_intermediate_file_path(eval_file, f'_{judge}_score')
+        response_file = eval_file.replace('.xlsx', f'_{judge}_response.pkl')
+        tmp_file = eval_file.replace('.xlsx', f'_{judge}_tmp.pkl')
+        tgt_file = eval_file.replace('.xlsx', f'_{judge}_rating.json')
+        score_file = eval_file.replace('.xlsx', f'_{judge}_score.xlsx')
 
         judge_kwargs['temperature'] = 0.0
         model = build_judge(**judge_kwargs)
@@ -356,7 +355,7 @@ class Video_MMLU_CAP(VideoBaseDataset):
         return rating
 
 
-class Video_MMLU_QA(VideoBaseDataset):
+class VideoMMLU_QA(VideoBaseDataset):
 
     MD5 = ''
 
@@ -388,7 +387,7 @@ class Video_MMLU_QA(VideoBaseDataset):
 
     @classmethod
     def supported_datasets(cls):
-        return ['Video_MMLU_QA']
+        return ['VideoMMLU_QA']
 
     def prepare_dataset(self, dataset_name='Video_MMLU_QA', repo_id='Enxin/Video-MMLU'):
         def check_integrity(pth):
@@ -523,8 +522,8 @@ class Video_MMLU_QA(VideoBaseDataset):
                 for l in lines:
                     l = l.strip()
                     if ': ' in l:
-                        key = Video_MMLU_QA.remove_side_quote(l.split(': ')[0].strip())
-                        val = Video_MMLU_QA.remove_side_quote(l.split(': ')[1].strip())
+                        key = VideoMMLU_QA.remove_side_quote(l.split(': ')[0].strip())
+                        val = VideoMMLU_QA.remove_side_quote(l.split(': ')[1].strip())
                         if len(key) and len(val):
                             res[key] = val
                 return res
@@ -565,15 +564,15 @@ class Video_MMLU_QA(VideoBaseDataset):
     def evaluate(self, eval_file, **judge_kwargs):
         from .utils.video_mmlu import get_dimension_rating, prepare_score_prompt, SYSTEM_CAL_SCORE_PROMPT_QA
 
-        assert get_file_extension(eval_file) in ['xlsx', 'json', 'tsv'], 'data file should be an supported format (xlsx/json/tsv) file'
+        assert eval_file.endswith('.xlsx'), 'data file should be an xlsx file'
         judge = judge_kwargs['model']
         nproc = judge_kwargs.pop('nproc', 4)
         _ = judge_kwargs.pop('verbose', None)
         _ = judge_kwargs.pop('retry', None)
 
-        tmp_file = get_intermediate_file_path(eval_file, f'_{judge}_tmp', 'pkl')
-        tgt_file = get_intermediate_file_path(eval_file, f'_{judge}_rating', 'json')
-        score_file = get_intermediate_file_path(eval_file, f'_{judge}_score')
+        tmp_file = eval_file.replace('.xlsx', f'_{judge}_tmp.pkl')
+        tgt_file = eval_file.replace('.xlsx', f'_{judge}_rating.json')
+        score_file = eval_file.replace('.xlsx', f'_{judge}_score.xlsx')
 
         judge_kwargs['temperature'] = 0.0
         model = build_judge(**judge_kwargs)

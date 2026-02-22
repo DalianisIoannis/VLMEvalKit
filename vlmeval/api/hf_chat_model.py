@@ -101,6 +101,9 @@ class HFChatModel:
             precision = {'torch_dtype': torch.float16}
         elif 'internlm-chat-20b' in model_path:
             precision = {'torch_dtype': torch.bfloat16}
+        # elif model_path == '/srv/muse-lab/models/Llama-2-7b-chat-hf':
+        #     precision = {'torch_dtype': torch.bfloat16}
+        #     precision = {'torch_dtype': torch.bfloat32}
 
         self.tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         cuda_devices = os.environ.get('CUDA_VISIBLE_DEVICES', '0')
@@ -110,34 +113,75 @@ class HFChatModel:
         else:
             _ = {'': 0}
 
-        if 'llama' in self.model_path.lower():
+        # if 'llama' in self.model_path.lower():
+        if 'llama' in self.model_path.lower() and self.model_path != '/srv/muse-lab/models/Llama-2-7b-chat-hf':
             from lmdeploy import pipeline, GenerationConfig, TurbomindEngineConfig
             print(f"Loading model {model_path} with {num_gpu} GPUs")
             backend_config = TurbomindEngineConfig(tp=num_gpu)
             self.gen_config = GenerationConfig(max_new_tokens=256)
             model = pipeline(model_path, backend_config=backend_config)
         else:
-            model = LoadModel.from_pretrained(model_path, trust_remote_code=True, device_map='cpu', **precision)
-            model = model.eval()
+            self.use_vllm = kwargs.pop('use_vllm', False)
+            if not self.use_vllm:
+                model = LoadModel.from_pretrained(model_path, trust_remote_code=True, device_map='cpu', **precision)
+                model = model.eval()
+        
+                self.model = model
 
-            if device != 'cpu':
-                model = model.to(f'cuda:{device}' if isinstance(device, int) else 'cuda')
-            try:
-                from transformers.generation import GenerationConfig
-                model.generation_config = GenerationConfig.from_pretrained(
-                    model_path, trust_remote_code=True, device_map=device)
-            except Exception as err:
-                self.logger.warning(f'{type(err)}: {err}')
+                if device != 'cpu':
+                    model = model.to(f'cuda:{device}' if isinstance(device, int) else 'cuda')
+                try:
+                    from transformers.generation import GenerationConfig
+                    model.generation_config = GenerationConfig.from_pretrained(
+                        model_path, trust_remote_code=True, device_map=device)
+                except Exception as err:
+                    self.logger.warning(f'{type(err)}: {err}')
 
-            self.context_length = self._get_context_length_robust(model=model, model_path=model_path)
+                self.context_length = self._get_context_length_robust(model=model, model_path=model_path)
+            else:
+                from vllm import LLM
+                gpu_count = torch.cuda.device_count()
+
+                self.system_prompt = None   # judge doesn’t need multimodal special system prompt
+                tp_size = 1 if gpu_count == 0 else min(8, gpu_count)
+                logging.info(f"Using vLLM for {self.model_path} with {tp_size} GPUs")
+
+                self.llm = LLM(
+                    model=self.model_path,
+                    max_model_len=4096,                 # judge usually only needs <= 4k
+                    tensor_parallel_size=tp_size,
+                    gpu_memory_utilization=kwargs.get("gpu_utils", 0.75),
+                )
 
         torch.cuda.empty_cache()
-        self.model = model
         self.answer_buffer = 192
         self.system_prompt = system_prompt
         for k, v in kwargs.items():
             self.logger.info(f'Following args will be used for generation (If not set specifically), {k}: {v}. ')
         self.kwargs = kwargs
+
+    def generate_inner_vllm(self, message, dataset=None):
+        """
+        Generate text using the loaded model, given a prompt.
+        Not used for now
+
+        Args:
+            message (str): The input prompt string
+            dataset (str, optional): The dataset name to use. Defaults to None.
+
+        Returns:
+            str: The generated text
+        """
+        from vllm import SamplingParams
+        # here `message` is already a complete string from build_prompt_llama_judge
+        prompt = message  
+        sampling_params = SamplingParams(
+            temperature=0.0,
+            max_tokens=8192
+        )
+        # outputs = self.llm.generate({"prompt": prompt}, sampling_params)
+        outputs = self.llm.generate([prompt], sampling_params)
+        return outputs[0].outputs[0].text
 
     def generate_str(self, input, **kwargs):
         if 'baichuan' in self.model_path.lower():
@@ -164,8 +208,29 @@ class HFChatModel:
                 skip_special_tokens=True,
                 spaces_between_special_tokens=False)
         elif 'llama' in self.model_path.lower():
-            prompt = [{'role': 'system', 'content': self.system_prompt}, {'role': 'user', 'content': input}]
-            resp = self.model(prompt, gen_config=self.gen_config).text
+            if self.model_path != '/srv/muse-lab/models/Llama-2-7b-chat-hf':
+                ###############################################
+                # only this part was initially in this elif
+                prompt = [{'role': 'system', 'content': self.system_prompt}, {'role': 'user', 'content': input}]
+                resp = self.model(prompt, gen_config=self.gen_config).text
+                ###############################################
+            else:
+                # inputs = self.tokenizer([input], return_tensors='pt')
+                inputs = self.tokenizer([input], return_tensors="pt", truncation=True, max_length=8192)
+                # print(len(inputs['input_ids'][0]), input)
+                if torch.cuda.is_available():
+                    for k in inputs:
+                        inputs[k] = inputs[k].cuda()
+
+                params = dict(do_sample=True, temperature=0.2, repetition_penalty=1.0, max_new_tokens=512)
+                # params = dict(do_sample=True, temperature=0.2, repetition_penalty=1.0, max_new_tokens=256)
+                # params.update(self.kwargs)
+                outputs = self.model.generate(**inputs, **params)
+                resp = self.tokenizer.decode(
+                    outputs[0][len(inputs['input_ids'][0]):],
+                    skip_special_tokens=True,
+                    spaces_between_special_tokens=False)
+                ###############################################
         else:
             params = self.kwargs
             params.update(kwargs)
@@ -257,5 +322,29 @@ class HFChatModel:
     def generate(self, inputs, **kwargs):
         if isinstance(inputs, str):
             return self.generate_str(inputs, **kwargs)
+            # return self.generate_inner_vllm(inputs, **kwargs)
         elif isinstance(inputs, list):
             return self.generate_list(inputs, **kwargs)
+
+    def generate_batch_vllm(self, prompts):
+        """
+        Generate a batch of texts using vLLM.
+
+        Args:
+            prompts (list[str]): A list of strings to generate text from.
+
+        Returns:
+            list[str]: A list of generated texts, where the i-th element
+                corresponds to the i-th prompt.
+        """
+        from vllm import SamplingParams
+        sampling_params = SamplingParams(
+            temperature=0.0,
+            # max_tokens=1024
+            max_tokens=8192
+        )
+
+        # vLLM can take a list of strings directly
+        outputs = self.llm.generate(prompts, sampling_params)
+        # outputs[i] corresponds to prompts[i]
+        return [out.outputs[0].text for out in outputs]

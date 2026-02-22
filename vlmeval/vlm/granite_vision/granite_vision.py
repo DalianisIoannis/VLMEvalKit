@@ -13,6 +13,7 @@ from transformers import AutoModelForVision2Seq, AutoProcessor
 flash_attn_flag = False
 try:
     import flash_attn
+
     flash_attn_flag = True
 except ImportError:
     pass
@@ -28,12 +29,11 @@ class GraniteVision3(BaseModel):
         # assert not use_vllm "vLLM is not yet supported for evaluations in VLMEvalKit"
         self.model_path = model_path
         self.processor = AutoProcessor.from_pretrained(self.model_path)
-        attn_impl = "flash_attention_2" if flash_attn_flag else "eager"
         model = AutoModelForVision2Seq.from_pretrained(
             self.model_path,
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
-            attn_implementation=attn_impl
+            use_flash_attention_2=flash_attn_flag,
         )
 
         model = model.eval()
@@ -57,8 +57,6 @@ class GraniteVision3(BaseModel):
 
         if "<|end_of_text|>" in answer:
             answer = answer.split("<|end_of_text|>")[0].strip("\n ")
-        if "answer" in answer.lower():
-            answer = answer.lower().split("answer")[-1].strip(" :.-\n")
         if dataset in [
             "ChartQA_TEST",
             "DocVQA_VAL",
@@ -70,16 +68,14 @@ class GraniteVision3(BaseModel):
             "TextVQA_VAL"
         ]:
             answer = answer.strip(".")
-        if "ChartMuseum" in dataset:
-            answer = f"<answer>{answer}</answer>"
-        return answer.strip("\n")
+
+        return answer
 
     def use_custom_prompt(self, dataset):
         assert dataset is not None
         if DATASET_TYPE(dataset) == "MCQ":
             return True
-        if dataset in ["OCRBench", "COCO_VAL", "ChartQA_TEST", "CharXiv_descriptive_val", "ChartMimic_v1_direct",
-                       "ChartMimic_v2_direct", "ChartMimic_v2_customized",]:
+        if dataset in ["OCRBench", "COCO_VAL"]:
             return True
         return False
 
@@ -90,11 +86,6 @@ class GraniteVision3(BaseModel):
                 "\nReply with only one word or a short phrase or a full address.",
             ),
             "COCO_VAL": ("", "\nReply with one short sentence."),
-            "ChartQA_TEST": ("", "\nAnswer the question with a single word."),
-            "CharXiv_descriptive_val": ("", "\nAnswer the question with a single word or short phrase."),
-            "ChartMimic_v1_direct": ("", "\nAnswer using code only. strating with ```python and ending with ```"),
-            "ChartMimic_v2_direct": ("", "\nAnswer using code only. strating with ```python and ending with ```"),
-            "ChartMimic_v2_customized": ("", "\nAnswer using code only. strating with ```python and ending with ```"),
         }
         pre_post_prompt_cn = {}
 
@@ -180,10 +171,13 @@ class GraniteVision3(BaseModel):
                 "content": content,
             }
         ]
-        prompt = self.processor.apply_chat_template(conversation, tokenize=False, add_generation_prompt=True)
-        inputs = self.processor(images=images, text=prompt, return_tensors="pt").to(self.model.device, self.model.dtype)
-        with torch.no_grad():
-            output = self.model.generate(**inputs, **self.kwargs)
+        prompt = self.processor.apply_chat_template(
+            conversation, add_generation_prompt=True
+        )
+        inputs = self.processor(prompt, images, return_tensors="pt").to(
+            "cuda", torch.float16
+        )
+        output = self.model.generate(**inputs, **self.kwargs)
         answer = self.processor.decode(output[0], skip_special_token=True)
         answer = self.output_process(answer, dataset)
         return answer

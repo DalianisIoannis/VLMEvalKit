@@ -4,7 +4,6 @@ import re
 from .image_base import ImageBaseDataset
 from .utils import build_judge, DEBUG_MESSAGE
 from ..smp import *
-from ..smp.file import get_intermediate_file_path
 from ..utils import track_progress_rich
 from ..dataset.utils.mmif.function_and_compare import *
 
@@ -293,7 +292,7 @@ def judge_one_item(item, retry=3):
                     for func_dict in constraint["judge"]["verify_funcs"]:
                         func = globals()[func_dict["func"]]
                         # use * to unpack the list, ** is used for dict
-                        judge_result = func(str(item["prediction"]), *func_dict["params"])
+                        judge_result = func(item["prediction"], *func_dict["params"])
                         # breakpoint()
                         if not judge_result:  # False -> score = 0
                             score = 0.0
@@ -371,10 +370,11 @@ class MMIFEval(ImageBaseDataset):
     def evaluate(self, eval_file, **judge_kwargs):
         raw_bench_data = MMIFEval("MM-IFEval").data
         global aux_data_dict
+        suffix = eval_file.split(".")[-1]
         model = judge_kwargs["model"]
-        storage = get_intermediate_file_path(eval_file, f"_{model}", "jsonl")
-        score_file = get_intermediate_file_path(eval_file, f"_{model}_score", "csv")
-        tmp_file = get_intermediate_file_path(eval_file, f"_{model}_tmp", "pkl")
+        storage = eval_file.replace(f".{suffix}", f"_{model}.jsonl")
+        score_file = eval_file.replace(f".{suffix}", f"_{model}_score.csv")
+        tmp_file = eval_file.replace(f".{suffix}", f"_{model}_tmp.pkl")
         nproc = judge_kwargs.pop("nproc", 4)
 
         data_all = load(eval_file).to_dict(orient="records")
@@ -463,7 +463,7 @@ class MMIFEval(ImageBaseDataset):
                 p_level_score_sum += line["eval_score_dict"]["total_score"]
                 p_level_cnt += 1
             elif line["tag"] == "C-Level":
-                c_level_score_sum += line["eval_score_dict"].get("total_score", 0.)
+                c_level_score_sum += line["eval_score_dict"]["total_score"]
                 c_level_cnt += 1
         p_level_accuracy = p_level_score_sum / p_level_cnt
         c_level_accuracy = c_level_score_sum / c_level_cnt

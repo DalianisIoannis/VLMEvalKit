@@ -23,7 +23,8 @@ class PaliGemma(BaseModel):
         model = PaliGemmaForConditionalGeneration.from_pretrained(
             model_path,
             torch_dtype=torch.bfloat16,
-            device_map='auto',
+            device_map='cpu',
+            revision='bfloat16',
         ).eval()
         self.model = model.cuda()
         self.processor = AutoProcessor.from_pretrained(model_path)
@@ -98,7 +99,7 @@ class Gemma3(BaseModel):
             # export VLLM_WORKER_MULTIPROC_METHOD=spawn
         else:
             self.model = Gemma3ForConditionalGeneration.from_pretrained(
-                model_path, device_map="cuda", attn_implementation="flash_attention_2", torch_dtype=torch.bfloat16
+                model_path, device_map="cuda", attn_implementation="flash_attention_2"
             ).eval()
             self.device = self.model.device
 

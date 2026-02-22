@@ -10,10 +10,11 @@ import warnings
 import json
 
 try:
-    from .utils import build_judge
+    from .utils import build_judge, DEBUG_MESSAGE
 except ImportError:
-    raise NotImplementedError("Judge functionality is not available in your current VLMEvalKit version.")
-    # DEBUG_MESSAGE = "Your VLMEvalKit version may not support Judge models."
+    def build_judge(**kwargs):
+        raise NotImplementedError("Judge functionality is not available in your current VLMEvalKit version.")
+    DEBUG_MESSAGE = "Your VLMEvalKit version may not support Judge models."
 
 
 class GOBenchDataset(ImageBaseDataset):
@@ -152,7 +153,7 @@ class GOBenchDataset(ImageBaseDataset):
             'Instruction_Consistency_Score': [avg_scores.get('consistency', 0) * 100]
         })
 
-        score_file = get_intermediate_file_path(eval_file, '_score')
+        score_file = eval_file.replace('.xlsx', '_score.xlsx')
         dump(final_df, score_file)
         print(f"Detailed scores including failed attempts saved to {score_file}")
 

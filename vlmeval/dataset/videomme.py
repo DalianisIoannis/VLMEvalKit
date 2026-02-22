@@ -1,6 +1,5 @@
 from huggingface_hub import snapshot_download
 from ..smp import *
-from ..smp.file import get_intermediate_file_path, get_file_extension
 from .video_base import VideoBaseDataset
 from .utils import build_judge, DEBUG_MESSAGE
 
@@ -48,7 +47,6 @@ Respond with only the letter (A, B, C, or D) of the correct option.
 """
 
     TYPE = 'Video-MCQ'
-    DEFAULT_JUDGE = ['chatgpt-0125', 'gpt-4-0125']
 
     def __init__(self, dataset='Video-MME', use_subtitle=False, nframe=0, fps=-1):
         super().__init__(dataset=dataset, nframe=nframe, fps=fps)
@@ -76,7 +74,8 @@ Respond with only the letter (A, B, C, or D) of the correct option.
             return True
 
         cache_path = get_cache_path(repo_id)
-        if cache_path is not None and check_integrity(cache_path):
+        # if cache_path is not None and check_integrity(cache_path):
+        if cache_path is not None:
             dataset_path = cache_path
         else:
 
@@ -166,7 +165,8 @@ Respond with only the letter (A, B, C, or D) of the correct option.
         if self.nframe > 0 and self.fps < 0:
             step_size = len(vid) / (self.nframe + 1)
             indices = [int(i * step_size) for i in range(1, self.nframe + 1)]
-            frame_paths = self.frame_paths(video)
+            # frame_paths = self.frame_paths(video)
+            frame_paths = self.frame_paths(video, video_llm=video_llm)
         elif self.fps > 0:
             # not constrained by num_frames, get frames by fps
             total_duration = video_info['n_frames'] / video_info['fps']
@@ -178,14 +178,15 @@ Respond with only the letter (A, B, C, or D) of the correct option.
         flag = np.all([osp.exists(p) for p in frame_paths])
 
         if not flag:
-            lock_path = osp.splitext(vid_path)[0] + '.lock'
-            with portalocker.Lock(lock_path, 'w', timeout=30):
-                if not np.all([osp.exists(p) for p in frame_paths]):
-                    images = [vid[i].asnumpy() for i in indices]
-                    images = [Image.fromarray(arr) for arr in images]
-                    for im, pth in zip(images, frame_paths):
-                        if not osp.exists(pth):
-                            im.save(pth)
+            # extra if to avoid unecessary image reading
+            if not video_llm:
+            # extra if to avoid unecessary image reading
+                images = [vid[i].asnumpy() for i in indices]
+                images = [Image.fromarray(arr) for arr in images]
+                for im, pth in zip(images, frame_paths):
+                    # video_llm decides if the model I use is for videos, otherwise it saves frames to be used
+                    if not osp.exists(pth) and not video_llm:
+                        im.save(pth)
 
         return frame_paths, indices, video_info
 
@@ -193,6 +194,12 @@ Respond with only the letter (A, B, C, or D) of the correct option.
         if isinstance(line, int):
             assert line < len(self)
             line = self.data.iloc[line]
+        
+        # to avoid SettingWithCopyWarning: 
+        # A value is trying to be set on a copy of a slice from a DataFrame
+        # See the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy
+        # line['question'] += '\n' + '\n'.join(eval(line['candidates']))
+        line = line.copy()
 
         frames, indices, video_info = self.save_video_frames(line['video'], video_llm)
 
@@ -223,8 +230,8 @@ Respond with only the letter (A, B, C, or D) of the correct option.
 
         text_prompt = self.FRAMES_TMPL_NOSUB if not self.use_subtitle else self.FRAMES_TMPL_SUB.format(subtitles)
         message.append(dict(type='text', value=text_prompt))
-        question = line['question'] + '\n' + '\n'.join(eval(line['candidates']))
-        prompt = 'Question: {}\nAnswer: '.format(question)
+        line['question'] += '\n' + '\n'.join(eval(line['candidates']))
+        prompt = 'Question: {}\nAnswer: '.format(line['question'])
         message.append(dict(type='text', value=prompt))
         return message
 
@@ -233,23 +240,27 @@ Respond with only the letter (A, B, C, or D) of the correct option.
     def evaluate(self, eval_file, **judge_kwargs):
         from .utils.videomme import get_dimension_rating, extract_characters_regex, extract_option
 
-        assert get_file_extension(eval_file) in ['xlsx', 'json', 'tsv'], 'data file should be an supported format (xlsx/json/tsv) file'  # noqa: E501
+        assert eval_file.endswith('.xlsx'), 'data file should be an xlsx file'
 
-        tmp_file = get_intermediate_file_path(eval_file, '_tmp', 'pkl')
-        tgt_file = get_intermediate_file_path(eval_file, '_rating', 'json')
-        score_file = get_intermediate_file_path(eval_file, '_score')
+        tmp_file = eval_file.replace('.xlsx', '_tmp.pkl')
+        tgt_file = eval_file.replace('.xlsx', '_rating.json')
+        score_file = eval_file.replace('.xlsx', '_score.xlsx')
 
         if not osp.exists(score_file):
             model = judge_kwargs.get('model', 'exact_matching')
+            assert model in ['chatgpt-0125', 'exact_matching', 'gpt-4-0125']
 
             if model == 'exact_matching':
                 model = None
-            else:
+            elif gpt_key_set():
                 model = build_judge(**judge_kwargs)
                 if not model.working():
                     warnings.warn('OPENAI API is not working properly, will use exact matching for evaluation')
                     warnings.warn(DEBUG_MESSAGE)
                     model = None
+            else:
+                warnings.warn('OPENAI_API_KEY is not set properly, will use exact matching for evaluation')
+                model = None
             res = {} if not osp.exists(tmp_file) else load(tmp_file)
             res = {k: v for k, v in res.items() if FAIL_MSG not in v}
 
@@ -266,9 +277,9 @@ Respond with only the letter (A, B, C, or D) of the correct option.
                         data.loc[data['index'] == idx].to_dict(orient='records')[0],
                         'Video-MME'
                     )
-                    data.loc[data['index'] == idx, 'score'] = int(extract_pred == ans)
+                    data.loc[idx, 'score'] = int(extract_pred == ans)
                 else:
-                    data.loc[data['index'] == idx, 'score'] = int(extract_characters_regex(pred) == ans)
+                    data.loc[idx, 'score'] = int(extract_characters_regex(pred) == ans)
 
             rejected = [x for x in data['score'] if x == -1]
 

@@ -10,15 +10,32 @@ def img_root_map(dataset):
         return 'CRPE'
     if 'OCRVQA' in dataset:
         return 'OCRVQA'
-    if 'COCO_VAL' == dataset:
+    # if 'COCO_VAL' == dataset:
+    #     return 'COCO'
+    if dataset in ['COCO_VAL', 'COCO_VAL_bdp_lan_rgb_00', 'COCO_VAL_bdp_lan_rgb_01', 'COCO_VAL_bdp_lan_rgb_02',
+                   'COCO_VAL_bdp_lan_rgb_03', 'COCO_VAL_bdp_lan_rgb_04', 'COCO_VAL_bdp_lan_rgb_05',
+                   'COCO_VAL_bdp_lan_rgb_06', 'COCO_VAL_bdp_lan_rgb_07', 'COCO_VAL_bdp_lan_rgb_08', 'COCO_VAL_bdp_lan_rgb_09']:
         return 'COCO'
+    if 'MMMU' in dataset:
+        return 'MMMU'
     if "QSpatial" in dataset:
         return "QSpatial"
 
     mmbench_root_map = {
         'MMBench_DEV_EN': 'MMBench', 'MMBench_TEST_EN': 'MMBench',
+        ###########################################################
+        'MMBench_DEV_EN_bdp_lan_rgb_00': 'MMBench',
+        'MMBench_DEV_EN_bdp_lan_rgb_01': 'MMBench',
+        'MMBench_DEV_EN_bdp_lan_rgb_02': 'MMBench',
+        'MMBench_DEV_EN_bdp_lan_rgb_03': 'MMBench',
+        'MMBench_DEV_EN_bdp_lan_rgb_04': 'MMBench',
+        'MMBench_DEV_EN_bdp_lan_rgb_05': 'MMBench',
+        'MMBench_DEV_EN_bdp_lan_rgb_06': 'MMBench',
+        'MMBench_DEV_EN_bdp_lan_rgb_07': 'MMBench',
+        'MMBench_DEV_EN_bdp_lan_rgb_08': 'MMBench',
+        'MMBench_DEV_EN_bdp_lan_rgb_09': 'MMBench',
+        ###########################################################
         'MMBench_DEV_CN': 'MMBench', 'MMBench_TEST_CN': 'MMBench',
-        'MMBench_DEV_KO': 'MMBench',
         'MMBench': 'MMBench', 'MMBench_CN': 'MMBench',
         'MMBench_DEV_EN_V11': 'MMBench_V11', 'MMBench_TEST_EN_V11': 'MMBench_V11',
         'MMBench_DEV_CN_V11': 'MMBench_V11', 'MMBench_TEST_CN_V11': 'MMBench_V11',
@@ -36,9 +53,11 @@ class ImageBaseDataset:
     DATASET_MD5 = {}
 
     def __init__(self, dataset='MMBench', skip_noimg=True):
-        ROOT = LMUDataRoot()
+        ROOT = LMUDataRoot() # '/path/to/home/LMUData'
+
         # You can override this variable to save image files to a different directory
         self.dataset_name = dataset
+        # '/path/to/home/LMUData/images/MMBench'
         self.img_root = osp.join(ROOT, 'images', img_root_map(dataset))
 
         data = self.load_data(dataset)
@@ -63,7 +82,7 @@ class ImageBaseDataset:
             images = [toliststr(image_map[k]) for k in data['index']]
             data['image'] = [x[0] if len(x) == 1 else x for x in images]
             self.meta_only = False
-
+            # images of byte type do not change
         if 'image_path' in data:
             paths = [toliststr(x) for x in data['image_path']]
             data['image_path'] = [x[0] if len(x) == 1 else x for x in paths]
@@ -91,14 +110,18 @@ class ImageBaseDataset:
 
         self.data_path = data_path
         if osp.exists(data_path):
-            if file_md5 is None or md5(data_path) == file_md5:
+            # if file_md5 is None or md5(data_path) == file_md5:
+            if file_md5 is None:
                 pass
             else:
-                warnings.warn(f'The tsv file is in {data_root}, but the md5 does not match, will re-download')
-                download_file(url, data_path)
-                update_flag = True
+                # warnings.warn(f'The tsv file is in {data_root}, but the md5 does not match, will re-download')
+                warnings.warn(f'The tsv file is in {data_root}, but I removed re-download')
+                # download_file(url, data_path)
+                # update_flag = True
         else:
-            if osp.exists(data_path_legacy) and (file_md5 is None or md5(data_path_legacy) == file_md5):
+            # if osp.exists(data_path_legacy) and (file_md5 is None or md5(data_path_legacy) == file_md5):
+            print("data_path_legacy ", data_path_legacy)
+            if osp.exists(data_path_legacy):
                 warnings.warn(
                     'Due to a modification in #1055, the local target file name has changed. '
                     f'We detected the tsv file with legacy name {data_path_legacy} exists and will do the rename. '
@@ -141,7 +164,7 @@ class ImageBaseDataset:
                     decode_base64_to_image_file(line['image'], tgt_path)
                 tgt_path = [tgt_path]
             else:
-                tgt_path = osp.join(self.img_root, f"{line['index']}.png")
+                tgt_path = osp.join(self.img_root, f"{line['index']}.jpg")
                 if not read_ok(tgt_path):
                     decode_base64_to_image_file(line['image'], tgt_path)
                 tgt_path = [tgt_path]

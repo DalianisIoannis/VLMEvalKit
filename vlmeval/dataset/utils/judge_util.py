@@ -10,6 +10,8 @@ def build_judge(**kwargs):
     kwargs.pop('nproc', None)
     load_env()
     LOCAL_LLM = os.environ.get('LOCAL_LLM', None)
+    # LOCAL_LLM = os.environ.get('LOCAL_LLM', "meta-llama/Llama-2-7b-chat-hf")
+    # LOCAL_LLM = os.environ.get('LOCAL_LLM', "/srv/muse-lab/models/Llama-2-7b-chat-hf")
     if LOCAL_LLM is None:
         model_map = {
             'gpt-4-turbo': 'gpt-4-1106-preview',
@@ -26,17 +28,23 @@ def build_judge(**kwargs):
             'qwen-72b': 'Qwen/Qwen2.5-72B-Instruct',
             'deepseek': 'deepseek-ai/DeepSeek-V3',
             'llama31-8b': 'meta-llama/Llama-3.1-8B-Instruct',
+            '/srv/muse-lab/models/Llama-2-7b-chat-hf': '/srv/muse-lab/models/Llama-2-7b-chat-hf',
         }
         model_version = model_map[model] if model in model_map else model
     else:
         model_version = LOCAL_LLM
 
-    if model in ['qwen-7b', 'qwen-72b', 'deepseek']:
-        model = SiliconFlowAPI(model_version, **kwargs)
-    elif model == 'llama31-8b':
+    if model_version == "/srv/muse-lab/models/Llama-2-7b-chat-hf":
+        # add flag for vllm in args
+        kwargs['vllm'] = True
         model = HFChatModel(model_version, **kwargs)
     else:
-        model = OpenAIWrapper(model_version, **kwargs)
+        if model in ['qwen-7b', 'qwen-72b', 'deepseek']:
+            model = SiliconFlowAPI(model_version, **kwargs)
+        elif model == 'llama31-8b':
+            model = HFChatModel(model_version, **kwargs)
+        else:
+            model = OpenAIWrapper(model_version, **kwargs)
     return model
 
 
@@ -49,5 +57,5 @@ msgs = [dict(type='text', value='Hello!')]
 code, answer, resp = model.generate_inner(msgs)
 print(code, answer, resp)
 ```
-You can see the specific error if the API call fails.
+You cam see the specific error if the API call fails.
 """

@@ -11,6 +11,7 @@ class GeminiWrapper(BaseAPI):
     def __init__(self,
                  model: str = 'gemini-1.0-pro',
                  retry: int = 5,
+                 wait: int = 5,
                  key: str = None,
                  verbose: bool = True,
                  temperature: float = 0.0,
@@ -69,7 +70,7 @@ class GeminiWrapper(BaseAPI):
 
         if proxy is not None:
             proxy_set(proxy)
-        super().__init__(retry=retry, system_prompt=system_prompt, verbose=verbose, **kwargs)
+        super().__init__(wait=wait, retry=retry, system_prompt=system_prompt, verbose=verbose, **kwargs)
 
     def upload_video_genai(self, video_path):
         from google import genai
