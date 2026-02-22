@@ -1,152 +1,357 @@
-![LOGO](http://opencompass.openxlab.space/utils/MMLB.jpg)
+# VLMEvalKit Fork - Multimodal Workload Evaluation for Thesis Research
 
-<b>A Toolkit for Evaluating Large Vision-Language Models. </b>
+## Overview
 
-[![][github-contributors-shield]][github-contributors-link] • [![][github-forks-shield]][github-forks-link] • [![][github-stars-shield]][github-stars-link] • [![][github-issues-shield]][github-issues-link] • [![][github-license-shield]][github-license-link]
+This repository is a fork of the [VLMEvalKit](https://github.com/open-compass/VLMEvalKit) toolkit, customized for thesis research on **system-level evaluation of multimodal workloads**. The focus of this work is evaluating how Vision-Language Models (VLMs) perform under different input modality alterations, specifically:
 
-English | [简体中文](/docs/zh-CN/README_zh-CN.md) | [日本語](/docs/ja/README_ja.md)
+- **Image compression** at various quality levels
+- **Video frame sampling techniques** (uniform, scene change detection, motion-based, sharpness-based)
 
-<a href="https://rank.opencompass.org.cn/leaderboard-multimodal">🏆 OC Learderboard </a> •
-<a href="#%EF%B8%8F-quickstart">🏗️Quickstart </a> •
-<a href="#-datasets-models-and-evaluation-results">📊Datasets & Models </a> •
-<a href="#%EF%B8%8F-development-guide">🛠️Development </a>
+The system-level performance evaluation was conducted in a separate project, while this repository focuses on the **accuracy and quality metrics** of VLM responses to altered input modalities.
 
-<a href="https://huggingface.co/spaces/opencompass/open_vlm_leaderboard">🤗 HF Leaderboard</a> •
-<a href="https://huggingface.co/datasets/VLMEval/OpenVLMRecords">🤗 Evaluation Records</a> •
-<a href="https://huggingface.co/spaces/opencompass/openvlm_video_leaderboard">🤗 HF Video Leaderboard</a> •
+## Research Objectives
 
-<a href="https://discord.gg/evDT4GZmxN">🔊 Discord</a> •
-<a href="https://www.arxiv.org/abs/2407.11691">📝 Report</a> •
-<a href="#-the-goal-of-vlmevalkit">🎯Goal </a> •
-<a href="#%EF%B8%8F-citation">🖊️Citation </a>
-</div>
+The primary goal is to understand:
+1. How image compression affects VLM performance on multiple-choice and captioning tasks
+2. Which video frame sampling strategies are most effective for different video understanding benchmarks
+3. Whether intelligent frame sampling can maintain accuracy while reducing computational load
+4. The feasibility of running large multimodal models with memory optimizations (vLLM)
 
-**VLMEvalKit** (the python package name is **vlmeval**) is an **open-source evaluation toolkit** of **large vision-language models (LVLMs)**. It enables **one-command evaluation** of LVLMs on various benchmarks, without the heavy workload of data preparation under multiple repositories. In VLMEvalKit, we adopt **generation-based evaluation** for all LVLMs, and provide the evaluation results obtained with both **exact matching** and **LLM-based answer extraction**.
+## Key Modifications & Extensions
 
-## 🆕 News
+### 1. **Image Compression Experiments**
 
-> We have presented a [**comprehensive survey**](https://arxiv.org/pdf/2411.15296) on the evaluation of large multi-modality models, jointly with [**MME Team**](https://github.com/BradyFU/Awesome-Multimodal-Large-Language-Models) and [**LMMs-Lab**](https://lmms-lab.github.io) 🔥🔥🔥
-- **[2025-06-16]** Supported [**PhyX**](https://phyx-bench.github.io/), a benchmark aiming to assess capacity for physics-grounded reasoning in visual scenarios. 🔥🔥🔥
-- **[2025-05-24]** To facilitate faster evaluations for large-scale or thinking models, **VLMEvalKit supports multi-node distributed inference** using **LMDeploy**  (supports *InternVL Series, QwenVL Series, LLaMa4*) or **VLLM**(supports *QwenVL Series, LLaMa4*). You can activate this feature by adding the ```use_lmdeploy``` or ```use_vllm``` flag to your custom model configuration in [config.py](vlmeval/config.py) . Leverage these tools to significantly speed up your evaluation workflows 🔥🔥🔥
-- **[2025-05-24]** Supported Models: **InternVL3 Series, Gemini-2.5-Pro, Kimi-VL, LLaMA4, NVILA, Qwen2.5-Omni, Phi4, SmolVLM2, Grok, SAIL-VL-1.5, WeThink-Qwen2.5VL-7B, Bailingmm, VLM-R1, Taichu-VLR**. Supported Benchmarks: **HLE-Bench, MMVP, MM-AlignBench, Creation-MMBench, MM-IFEval, OmniDocBench, OCR-Reasoning, EMMA, ChaXiv，MedXpertQA, Physics, MSEarthMCQ, MicroBench, MMSci, VGRP-Bench, wildDoc, TDBench, VisuLogic, CVBench, LEGO-Puzzles, Video-MMLU, QBench-Video, MME-CoT, VLM2Bench, VMCBench, MOAT, Spatial457 Benchmark**. Please refer to [**VLMEvalKit Features**](https://aicarrier.feishu.cn/wiki/Qp7wwSzQ9iK1Y6kNUJVcr6zTnPe?table=tblsdEpLieDoCxtb) for more details. Thanks to all contributors 🔥🔥🔥
-- **[2025-02-20]** Supported Models: **InternVL2.5 Series, Qwen2.5VL Series, QVQ-72B, Doubao-VL, Janus-Pro-7B, MiniCPM-o-2.6, InternVL2-MPO, LLaVA-CoT, Hunyuan-Standard-Vision, Ovis2, Valley, SAIL-VL, Ross, Long-VITA, EMU3, SmolVLM**. Supported Benchmarks: **MMMU-Pro, WeMath, 3DSRBench, LogicVista, VL-RewardBench, CC-OCR, CG-Bench, CMMMU, WorldSense**. Thanks to all contributors 🔥🔥🔥
-- **[2024-12-11]** Supported [**NaturalBench**](https://huggingface.co/datasets/BaiqiL/NaturalBench), a vision-centric VQA benchmark (NeurIPS'24) that challenges vision-language models with simple questions about natural imagery.
-- **[2024-12-02]** Supported [**VisOnlyQA**](https://github.com/psunlpgroup/VisOnlyQA/), a benchmark for evaluating the visual perception capabilities 🔥🔥🔥
-- **[2024-11-26]** Supported [**Ovis1.6-Gemma2-27B**](https://huggingface.co/AIDC-AI/Ovis1.6-Gemma2-27B), thanks to [**runninglsy**](https://github.com/runninglsy) 🔥🔥🔥
-- **[2024-11-25]** Create a new flag `VLMEVALKIT_USE_MODELSCOPE`. By setting this environment variable, you can download the video benchmarks supported from [**modelscope**](https://www.modelscope.cn) 🔥🔥🔥
-- **[2024-11-25]** Supported [**VizWiz**](https://vizwiz.org/tasks/vqa/) benchmark 🔥🔥🔥
-- **[2024-11-22]** Supported the inference of [**MMGenBench**](https://mmgenbench.alsoai.com), thanks [**lerogo**](https://github.com/lerogo) 🔥🔥🔥
-- **[2024-11-22]** Supported [**Dynamath**](https://huggingface.co/datasets/DynaMath/DynaMath_Sample), a multimodal math benchmark comprising of 501 SEED problems and 10 variants generated based on random seeds. The benchmark can be used to measure the robustness of MLLMs in multi-modal math solving 🔥🔥🔥
-- **[2024-11-21]** Integrated a new config system to enable more flexible evaluation settings. Check the [Document](/docs/en/ConfigSystem.md) or run `python run.py --help` for more details 🔥🔥🔥
-- **[2024-11-21]** Supported [**QSpatial**](https://andrewliao11.github.io/spatial_prompt/), a multimodal benchmark for Quantitative Spatial Reasoning (determine the size / distance, e.g.), thanks [**andrewliao11**](https://github.com/andrewliao11)  for providing the official support 🔥🔥🔥
-- **[2024-11-21]** Supported [**MM-Math**](https://github.com/kge-sun/mm-math), a new multimodal math benchmark comprising of ~6K middle school multi-modal reasoning math problems. GPT-4o-20240806 achieces 22.5% accuracy on this benchmark 🔥🔥🔥
+Created compressed dataset variants at 10 different quality levels (0-90% compression) for:
+- **MMBench_DEV_EN**: Multiple-choice visual reasoning benchmark
+- **COCO_VAL**: Image captioning benchmark
+- **LLaVABench**: Visual question answering benchmark
 
-## 🏗️ QuickStart
+Dataset naming convention: `{DATASET}_bdp_lan_rgb_{LEVEL}` where LEVEL ranges from 00 to 09.
 
-See [[QuickStart](/docs/en/Quickstart.md) | [快速开始](/docs/zh-CN/Quickstart.md)] for a quick start guide.
+**Modified files:**
+- [vlmeval/dataset/image_base.py](vlmeval/dataset/image_base.py) - Added compressed dataset variants
+- [vlmeval/dataset/image_mcq.py](vlmeval/dataset/image_mcq.py) - Multiple-choice dataset URLs
+- [vlmeval/dataset/image_vqa.py](vlmeval/dataset/image_vqa.py) - VQA dataset support
 
-## 📊 Datasets, Models, and Evaluation Results
+### 2. **Video Frame Sampling Techniques**
 
-### Evaluation Results
+Implemented four intelligent sampling strategies for video understanding tasks:
 
-**The performance numbers on our official multi-modal leaderboards can be downloaded from here!**
+| Technique | Description | Key Parameter |
+|-----------|-------------|---------------|
+| **Uniform** | Evenly spaced frames (baseline) | Number of frames |
+| **Scene Change** | Frames at scene boundaries | Threshold (27 default) |
+| **Motion-based** | Frames with high motion | Motion score threshold (1 default) |
+| **Sharpness** | Sharpest frames from uniform grid | Blur threshold (100 default) |
 
-[**OpenVLM Leaderboard**](https://huggingface.co/spaces/opencompass/open_vlm_leaderboard): [**Download All DETAILED Results**](http://opencompass.openxlab.space/assets/OpenVLM.json).
+**Modified files:**
+- [vlmeval/vlm/pixtral.py](vlmeval/vlm/pixtral.py) - Pixtral model with clever sampling support
+- [vlmeval/vlm/qwen2_vl/model.py](vlmeval/vlm/qwen2_vl/model.py) - Qwen2-VL clever sampling
+- [vlmeval/vlm/llava/llava.py](vlmeval/vlm/llava/llava.py) - LLaVA model sampling support
+- [vlmeval/inference_video.py](vlmeval/inference_video.py) - Video inference pipeline
+- [giannis_stuff/giannis_utils.py](giannis_stuff/giannis_utils.py) - Sampling utility functions
 
-Check **Supported Benchmarks** Tab in [**VLMEvalKit Features**](https://aicarrier.feishu.cn/wiki/Qp7wwSzQ9iK1Y6kNUJVcr6zTnPe?table=tblsdEpLieDoCxtb) to view all supported image & video benchmarks (70+).
+### 3. **vLLM Integration for Pixtral**
 
-Check **Supported LMMs** Tab in [**VLMEvalKit Features**](https://aicarrier.feishu.cn/wiki/Qp7wwSzQ9iK1Y6kNUJVcr6zTnPe?table=tblsdEpLieDoCxtb) to view all supported LMMs, including commercial APIs, open-source models, and more (200+).
+Enabled vLLM inference for the Pixtral-12B model to reduce memory footprint and enable execution on resource-constrained hardware.
 
-**Transformers Version Recommendation:**
+**Key changes:**
+- Modified scheduler to handle large outputs without premature termination
+- Added batch processing support
+- Implemented smart image resizing to fit within model constraints
 
-Note that some VLMs may not be able to run under certain transformer versions, we recommend the following settings to evaluate each VLM:
+**Modified files:**
+- [vlmeval/vlm/pixtral.py](vlmeval/vlm/pixtral.py)
+- External vLLM library modifications documented in [trails.ipynb](giannis_stuff/trails.ipynb)
 
-- **Please use** `transformers==4.33.0` **for**: `Qwen series`, `Monkey series`, `InternLM-XComposer Series`, `mPLUG-Owl2`, `OpenFlamingo v2`, `IDEFICS series`, `VisualGLM`, `MMAlaya`, `ShareCaptioner`, `MiniGPT-4 series`, `InstructBLIP series`, `PandaGPT`, `VXVERSE`.
-- **Please use** `transformers==4.36.2` **for**: `Moondream1`.
-- **Please use** `transformers==4.37.0` **for**: `LLaVA series`, `ShareGPT4V series`, `TransCore-M`, `LLaVA (XTuner)`, `CogVLM Series`, `EMU2 Series`, `Yi-VL Series`, `MiniCPM-[V1/V2]`, `OmniLMM-12B`, `DeepSeek-VL series`, `InternVL series`, `Cambrian Series`, `VILA Series`, `Llama-3-MixSenseV1_1`, `Parrot-7B`, `PLLaVA Series`.
-- **Please use** `transformers==4.40.0` **for**: `IDEFICS2`, `Bunny-Llama3`, `MiniCPM-Llama3-V2.5`, `360VL-70B`, `Phi-3-Vision`, `WeMM`.
-- **Please use** `transformers==4.42.0` **for**: `AKI`.
-- **Please use** `transformers==4.44.0` **for**: `Moondream2`, `H2OVL series`.
-- **Please use** `transformers==4.45.0` **for**: `Aria`.
-- **Please use** `transformers==latest` **for**: `LLaVA-Next series`, `PaliGemma-3B`, `Chameleon series`, `Video-LLaVA-7B-HF`, `Ovis series`, `Mantis series`, `MiniCPM-V2.6`, `OmChat-v2.0-13B-sinlge-beta`, `Idefics-3`, `GLM-4v-9B`, `VideoChat2-HD`, `RBDash_72b`, `Llama-3.2 series`, `Kosmos series`.
+### 4. **Local Judge Model Integration**
 
-**Torchvision Version Recommendation:**
+Replaced paid OpenAI API-based evaluation with a local Llama-2-7B judge model to:
+- Reduce evaluation costs
+- Enable offline evaluation
+- Support vLLM acceleration for faster judging
 
-Note that some VLMs may not be able to run under certain torchvision versions, we recommend the following settings to evaluate each VLM:
+**Modified files:**
+- [vlmeval/api/hf_chat_model.py](vlmeval/api/hf_chat_model.py) - HuggingFace chat model wrapper with vLLM support
+- [vlmeval/dataset/utils/judge_util.py](vlmeval/dataset/utils/judge_util.py) - Judge model selection logic
+- [vlmeval/dataset/utils/llavabench.py](vlmeval/dataset/utils/llavabench.py) - Custom prompts and parsing for Llama judge
 
-- **Please use** `torchvision>=0.16` **for**: `Moondream series` and `Aria`
+### 5. **Custom Datasets**
 
-**Flash-attn Version Recommendation:**
+Added support for custom video multiple-choice dataset:
+- **LLaVA-Video-Multiple-Choice**: Custom evaluation dataset
 
-Note that some VLMs may not be able to run under certain flash-attention versions, we recommend the following settings to evaluate each VLM:
+**Files:**
+- [vlmeval/dataset/llava_video_dataset.py](vlmeval/dataset/llava_video_dataset.py)
+- [vlmeval/dataset/video_dataset_config.py](vlmeval/dataset/video_dataset_config.py)
 
-- **Please use** `pip install flash-attn --no-build-isolation` **for**: `Aria`
+## Models Evaluated
 
-```python
-# Demo
-from vlmeval.config import supported_VLM
-model = supported_VLM['idefics_9b_instruct']()
-# Forward Single Image
-ret = model.generate(['assets/apple.jpg', 'What is in this image?'])
-print(ret)  # The image features a red apple with a leaf on it.
-# Forward Multiple Images
-ret = model.generate(['assets/apple.jpg', 'assets/apple.jpg', 'How many apples are there in the provided images? '])
-print(ret)  # There are two apples in the provided images.
+- **Qwen2-VL-7B-Instruct** & **Qwen2-VL-2B-Instruct**
+- **LLaVA-OneVision Qwen2 7B** & **0.5B**
+- **Pixtral-12B** (with and without vLLM)
+
+## Datasets Used
+
+### Image Benchmarks
+- **MMBench_DEV_EN**: Multiple-choice visual reasoning (350 samples)
+- **COCO_VAL**: Image captioning (350 samples)
+- **LLaVABench**: Visual question answering
+
+### Video Benchmarks
+- **Video-MME**: Video multiple-choice QA (350 samples)
+- **MMBench-Video**: Video-based reasoning
+- **TempCompass**: Temporal captioning
+
+## Repository Structure
+
+```
+VLMEvalKit/
+├── giannis_stuff/              # Thesis-specific code and analysis
+│   ├── giannis_utils.py        # Utility functions (sampling, metrics, plotting)
+│   ├── trails.ipynb            # Experimental notebook with detailed notes
+│   ├── run_video_configs.sh   # Batch evaluation script
+│   └── plots/                  # Generated visualizations
+├── vlmeval/                    # Modified VLMEvalKit core
+│   ├── vlm/                    # Model implementations (Pixtral, Qwen, LLaVA)
+│   ├── dataset/                # Dataset loaders and processors
+│   ├── api/                    # API wrappers (including local judge)
+│   └── inference_video.py      # Video inference pipeline
+├── requirements/               # Environment-specific dependencies
+│   ├── image_multiple_choice.txt
+│   ├── llava_video_kind.txt
+│   └── image_pixtral.txt
+├── outputs/                    # Evaluation results (not in repo)
+└── config.json                 # Evaluation configuration
 ```
 
-## 🛠️ Development Guide
+## Installation & Setup
 
-To develop custom benchmarks, VLMs, or simply contribute other codes to **VLMEvalKit**, please refer to [[Development_Guide](/docs/en/Development.md) | [开发指南](/docs/zh-CN/Development.md)].
+### Environment Setup
 
-**Call for contributions**
+Three separate virtual environments were used for different model types:
 
-To promote the contribution from the community and share the corresponding credit (in the next report update):
+```bash
+# 1. Image Multiple Choice (Qwen models)
+python3 -m venv .env_image_mc
+source .env_image_mc/bin/activate
+pip install -e .
+pip install -r requirements/image_multiple_choice.txt
 
-- All Contributions will be acknowledged in the report.
-- Contributors with 3 or more major contributions (implementing an MLLM, benchmark, or major feature) can join the author list of [VLMEvalKit Technical Report](https://www.arxiv.org/abs/2407.11691) on ArXiv. Eligible contributors can create an issue or dm kennyutc in [VLMEvalKit Discord Channel](https://discord.com/invite/evDT4GZmxN).
+# 2. LLaVA Video models
+python3 -m venv .env_llava_video
+source .env_llava_video/bin/activate
+pip install -e .
+pip install -r requirements/llava_video_kind.txt
 
-Here is a [contributor list](/docs/en/Contributors.md) we curated based on the records.
+# 3. Pixtral with vLLM
+python3 -m venv .env_pixtral_vllm
+source .env_pixtral_vllm/bin/activate
+pip install -e .
+pip install -r requirements/image_pixtral.txt
+pip install vllm
+```
 
-## 🎯 The Goal of VLMEvalKit
+### HuggingFace Authentication
 
-**The codebase is designed to:**
+Some models require HuggingFace authentication:
 
-1. Provide an **easy-to-use**, **opensource evaluation toolkit** to make it convenient for researchers & developers to evaluate existing LVLMs and make evaluation results **easy to reproduce**.
-2. Make it easy for VLM developers to evaluate their own models. To evaluate the VLM on multiple supported benchmarks, one just need to **implement a single `generate_inner()` function**, all other workloads (data downloading, data preprocessing, prediction inference, metric calculation) are handled by the codebase.
+```bash
+huggingface-cli login
+```
 
-**The codebase is not designed to:**
+Store token in: `/path/to/data/.cache/huggingface/token`
 
-1. Reproduce the exact accuracy number reported in the original papers of all **3rd party benchmarks**. The reason can be two-fold:
-   1. VLMEvalKit uses **generation-based evaluation** for all VLMs (and optionally with **LLM-based answer extraction**). Meanwhile, some benchmarks may use different approaches (SEEDBench uses PPL-based evaluation, *eg.*). For those benchmarks, we compare both scores in the corresponding result. We encourage developers to support other evaluation paradigms in the codebase.
-   2. By default, we use the same prompt template for all VLMs to evaluate on a benchmark. Meanwhile, **some VLMs may have their specific prompt templates** (some may not covered by the codebase at this time). We encourage VLM developers to implement their own prompt template in VLMEvalKit, if that is not covered currently. That will help to improve the reproducibility.
+## Usage
 
-## 🖊️ Citation
+### Single Evaluation Run
 
-If you find this work helpful, please consider to **star🌟** this repo. Thanks for your support!
+```bash
+python run.py \
+    --data MMBench_DEV_EN \
+    --model Qwen2-VL-7B-Instruct \
+    --verbose \
+    --work-dir /path/to/outputs
+```
 
-[![Stargazers repo roster for @open-compass/VLMEvalKit](https://reporoster.com/stars/open-compass/VLMEvalKit)](https://github.com/open-compass/VLMEvalKit/stargazers)
+### Image Compression Evaluation
 
-If you use VLMEvalKit in your research or wish to refer to published OpenSource evaluation results, please use the following BibTeX entry and the BibTex entry corresponding to the specific VLM / benchmark you used.
+```bash
+python run.py \
+    --data MMBench_DEV_EN_bdp_lan_rgb_05 \
+    --model Pixtral-12B \
+    --verbose \
+    --work-dir /path/to/outputs
+```
 
-```bib
-@inproceedings{duan2024vlmevalkit,
-  title={Vlmevalkit: An open-source toolkit for evaluating large multi-modality models},
-  author={Duan, Haodong and Yang, Junming and Qiao, Yuxuan and Fang, Xinyu and Chen, Lin and Liu, Yuan and Dong, Xiaoyi and Zang, Yuhang and Zhang, Pan and Wang, Jiaqi and others},
-  booktitle={Proceedings of the 32nd ACM International Conference on Multimedia},
-  pages={11198--11201},
-  year={2024}
+### Video with Clever Sampling
+
+```bash
+python run.py \
+    --data Video-MME_64frame \
+    --model llava_onevision_qwen2_7b_ov \
+    --clever_sampling scene_change \
+    --max_frames 64 \
+    --sampling_extra_param 27 \
+    --verbose \
+    --work-dir /path/to/outputs
+```
+
+### Batch Video Evaluation
+
+```bash
+bash giannis_stuff/run_video_configs.sh
+```
+
+This script systematically evaluates:
+- Multiple models
+- All sampling techniques
+- Different frame counts
+- All video datasets
+
+### Using Configuration Files
+
+```bash
+python run.py \
+    --config config.json \
+    --verbose \
+    --work-dir /path/to/outputs
+```
+
+## Key Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `--data` | Dataset name | Required |
+| `--model` | Model name | Required |
+| `--work-dir` | Output directory | `./` |
+| `--clever_sampling` | Sampling technique: `scene_change`, `motion_based`, `sharpness` | None (uniform) |
+| `--max_frames` | Maximum video frames | Dataset default |
+| `--sampling_extra_param` | Technique-specific threshold | Varies |
+| `--reuse` | Reuse cached results | False |
+| `--verbose` | Verbose logging | False |
+
+## Important Implementation Notes
+
+### 1. Flash Attention Compatibility
+
+Some models require disabling flash attention. Modified:
+```python
+# .env/lib/python3.11/site-packages/llava/model/builder.py
+model = LlavaQwenForCausalLM.from_pretrained(
+    model_path, 
+    low_cpu_mem_usage=True,
+    # attn_implementation=attn_implementation,  # Commented out
+    **kwargs, 
+    trust_remote_code=False
+)
+```
+
+### 2. vLLM Scheduler Fix
+
+Modified vLLM scheduler to prevent early termination on large outputs:
+```python
+# vllm/v1/core/sched/scheduler.py line 819
+if request.num_computed_tokens > max_cache_tkns - 32:
+    stopped = True
+    request.status = RequestStatus.FINISHED_LENGTH_CAPPED
+```
+
+### 3. Dataset MD5 Checks
+
+Commented out MD5 validation for custom compressed datasets:
+- [vlmeval/dataset/image_base.py](vlmeval/dataset/image_base.py) lines 116-126
+- [vlmeval/dataset/tempcompass.py](vlmeval/dataset/tempcompass.py) line 288
+- [vlmeval/dataset/videomme.py](vlmeval/dataset/videomme.py) - various locations
+
+### 4. Pixtral Frame Resizing
+
+Pixtral requires frame dimension resizing to handle 64 frames:
+```python
+# Smart resize based on max_pixels constraint
+# Implemented in vlmeval/vlm/pixtral.py
+```
+
+### 5. Cached Frame Storage
+
+Sampled video frames are cached to avoid redundant processing:
+- Uniform sampling: `/path/to/data/LMUData/images/{DATASET}/{VIDEO_ID}/frame-{N}-of-{TOTAL}.jpg`
+- Clever sampling: `/path/to/data/.cache/huggingface/hub/datasets--{DATASET}/video_frames/{VIDEO_ID}/frame-{N}-{TECHNIQUE}-{PARAM}.jpg`
+
+## Results & Analysis
+
+Results are organized in timestamped directories:
+```
+outputs/
+└── {MODEL_NAME}/
+    └── {TIMESTAMP}/
+        ├── {DATASET}.xlsx        # Detailed predictions
+        └── {DATASET}_eval.csv    # Evaluation metrics
+```
+
+Analysis notebooks and plotting utilities are in [giannis_stuff/trails.ipynb](giannis_stuff/trails.ipynb).
+
+## Utilities & Helper Functions
+
+The [giannis_utils.py](giannis_stuff/giannis_utils.py) module provides:
+
+- **Frame sampling**: `apply_clever_sampling()`, scene change detection, motion analysis, sharpness scoring
+- **Data processing**: TSV/JSONL converters, dataset subsetting
+- **Evaluation**: Accuracy calculators, metric scorers (ROUGE, BLEU, CIDEr)
+- **Visualization**: CDF plots, frame size analysis, result comparisons
+- **Path management**: Centralized path configuration
+
+## Known Issues & Limitations
+
+1. **Pixtral + LLaVABench**: When using vLLM, run inference first with vLLM, then evaluate without vLLM to avoid CUDA OOM
+2. **Chinese responses**: Qwen2-VL-2B occasionally responds in Chinese for open-ended questions
+3. **Frame caching**: Be careful mixing models that resize frames (Pixtral) with those that don't (Qwen, LLaVA)
+4. **Judge model**: Local Llama judge may not match GPT-4 quality; results require manual review for edge cases
+5. **Environment isolation**: Different models require different transformer versions - use separate virtual environments
+
+## Environment Variables
+
+```bash
+# Data paths
+export HF_HOME=/path/to/huggingface/cache
+export CACHE_MODEL_DIR=/path/to/model/cache
+
+# CUDA optimization
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+# Judge model
+export LOCAL_LLM=/path/to/Llama-2-7b-chat-hf
+```
+
+## Citation
+
+If you use this work, please cite the original VLMEvalKit:
+
+```bibtex
+@misc{duan2024vlmevalkit,
+      title={VLMEvalKit: An Open-Source Toolkit for Evaluating Large Multi-Modality Models}, 
+      author={Haodong Duan and Junming Yang and Yuxuan Qiao and Xinyu Fang and Lin Chen and Yuan Liu and Xiaoyi Dong and Yuhang Zang and Pan Zhang and Jiaqi Wang and Dahua Lin and Kai Chen},
+      year={2024},
+      eprint={2407.11691},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV},
+      url={https://arxiv.org/abs/2407.11691}
 }
 ```
 
-<p align="right"><a href="#top">🔝Back to top</a></p>
+## Acknowledgments
 
-[github-contributors-link]: https://github.com/open-compass/VLMEvalKit/graphs/contributors
-[github-contributors-shield]: https://img.shields.io/github/contributors/open-compass/VLMEvalKit?color=c4f042&labelColor=black&style=flat-square
-[github-forks-link]: https://github.com/open-compass/VLMEvalKit/network/members
-[github-forks-shield]: https://img.shields.io/github/forks/open-compass/VLMEvalKit?color=8ae8ff&labelColor=black&style=flat-square
-[github-issues-link]: https://github.com/open-compass/VLMEvalKit/issues
-[github-issues-shield]: https://img.shields.io/github/issues/open-compass/VLMEvalKit?color=ff80eb&labelColor=black&style=flat-square
-[github-license-link]: https://github.com/open-compass/VLMEvalKit/blob/main/LICENSE
-[github-license-shield]: https://img.shields.io/github/license/open-compass/VLMEvalKit?color=white&labelColor=black&style=flat-square
-[github-stars-link]: https://github.com/open-compass/VLMEvalKit/stargazers
-[github-stars-shield]: https://img.shields.io/github/stars/open-compass/VLMEvalKit?color=ffcb47&labelColor=black&style=flat-square
+- Original VLMEvalKit team for the excellent evaluation framework
+- vLLM team for memory-efficient inference
+- Model providers: Mistral AI (Pixtral), Alibaba (Qwen), LLaVA team
+- Dataset creators: MMBench, COCO, Video-MME, TempCompass teams
+
+## Contact & Support
+
+For questions about the thesis-specific modifications, refer to the detailed notes in [trails.ipynb](giannis_stuff/trails.ipynb).
+
+For general VLMEvalKit issues, consult the [original repository](https://github.com/open-compass/VLMEvalKit).
+
+---
+
+**Note**: This is research code. Paths are configured for specific server environments and may require adjustment for your setup. See [trails.ipynb](giannis_stuff/trails.ipynb) for environment-specific configuration details.
