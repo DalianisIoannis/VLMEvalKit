@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository is a fork of the [VLMEvalKit](https://github.com/open-compass/VLMEvalKit) toolkit, customized for thesis research on **system-level evaluation of multimodal workloads**. The focus of this work is evaluating how Vision-Language Models (VLMs) perform under different input modality alterations, specifically:
+This repository is a fork of the [VLMEvalKit](https://github.com/open-compass/VLMEvalKit) toolkit, customized for thesis research on **system-level evaluation of multimodal workloads**. It was utilized as part of the ***[MSc-Thesis: System-Level Modality Reduction for Efficient Multimodal Large Language Model Serving](https://github.com/DalianisIoannis/MSc-Thesis-System-Level-Modality-Reduction-for-Efficient-Multimodal-Large-Language-Model-Serving/tree/main)*** project. The focus of this work is evaluating how Vision-Language Models (VLMs) perform under different input modality alterations, specifically:
 
 - **Image compression** at various quality levels
 - **Video frame sampling techniques** (uniform, scene change detection, motion-based, sharpness-based)
